@@ -61,6 +61,8 @@ function MainPage({ onEnterRoom }: MainPageProps) {
         placeholder="닉네임"
         value={nickname}
         onChange={(e) => setNickname(e.target.value)}
+        onCompositionEnd={(e) => setNickname(e.currentTarget.value)}
+        onBlur={(e) => setNickname(e.currentTarget.value)}
       />
       <div>
         <button onClick={handleCreateRoom}>방 만들기</button>

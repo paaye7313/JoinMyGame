@@ -18,6 +18,9 @@
 - ✅ 통합 테스트 — `docker compose up --build` 기동 후 socket.io-client로 방 생성→참가→Ready→선택→결과→재경기→재판정 전체 플로우 자동 검증 완료 (룸 코드 발급, rock-beats-scissors 판정, paper-paper 무승부 판정 모두 정상)
 - ✅ 브라우저 수동 테스트 — 사용자가 직접 브라우저에서 확인, 정상 작동 확인
 - ✅ GitHub 저장소 생성 및 연결 — https://github.com/paaye7313/JoinMyGame (Public), 초기 커밋 푸시 완료
+- ✅ 버그 수정: 재경기 동의 없이 첫 재경기가 즉시 시작되던 문제 — `room.service.ts`의 `finishRound`가 라운드 종료 시 `player.ready`를 리셋하지 않아, 로비 Ready 단계에서 남아있던 `ready=true`가 그대로 `markRematchReady`의 `allReady()` 판정에 재사용되던 것이 원인. `finishRound`에서 라운드 종료 시 전원 `ready=false`로 초기화하도록 수정. socket.io-client 스크립트로 "한쪽만 재경기 클릭 시 rematchStarted 미발생 / 양쪽 클릭 시 발생" 검증 완료.
+- ✅ 버그 수정(부분): 한글 닉네임 입력 중 마지막 글자가 사라지는 문제 — `MainPage.tsx`의 닉네임 `<input>`이 `onChange`(native `input` 이벤트)에만 의존해, IME 조합이 `input` 이벤트 없이 `compositionend`로만 끝나는 경우 React state가 갱신되지 않고, 이후 다른 상태 변화로 리렌더될 때 컨트롤드 인풋이 오래된 state로 DOM을 덮어써 글자가 사라짐. `onCompositionEnd`와 `onBlur`에서 실제 DOM 값을 state에 명시적으로 재동기화하도록 수정 — "같은 페이지 안에서 다른 입력으로 포커스 이동" 케이스는 Playwright로 재현·수정 확인 완료. 단, "브라우저 탭 전환 단축키와 마지막 키 입력이 정확히 겹쳐 그 키 자체가 브라우저 크롬으로 소비되는" 레이스 컨디션은 웹페이지 JS로 근본 해결 불가능한 브라우저/OS IME 레벨 이슈로 확인됨(대형 한국 사이트에서도 동일 현상 재현되는 것을 사용자가 확인) — 이 부분은 프로젝트 코드로 추가 조치하지 않기로 함.
+- ✅ `frontend/index.html`의 `<html lang="en">` → `lang="ko"`로 변경 — 크롬이 페이지를 영어로 오인해 새로고침 시 번역 팝업이 뜨던 문제 해결 (IME 버그와는 무관, 별개 개선).
 
 ## 2. 현재 진행 중인 작업
 
@@ -35,3 +38,4 @@
 - Ready 상태는 서버가 상대방의 ready 여부를 별도로 브로드캐스트하지 않으므로(스펙상 `gameStarted`만 존재), `RoomPage`는 본인 Ready 클릭 여부만 로컬 상태로 표시함. 상대방이 Ready했는지는 UI에 노출되지 않고 양측 모두 Ready되면 바로 `gameStarted`로 게임 화면 전환됨.
 - 컨테이너는 현재 실행 중 (`docker compose up -d` 상태) — 필요시 `docker compose down`.
 - gh CLI가 로컬에 없었어서 winget으로 설치 후 `gh auth login`으로 로그인, `gh repo create --source=. --push`로 저장소 생성과 첫 푸시를 한 번에 진행함.
+- Windows 바인드 마운트에서는 `tsx watch`(backend)와 Vite HMR(frontend) 모두 파일 변경 감지를 놓치는 경우가 있었음 — 코드 수정 후 브라우저/API에 반영이 안 되면 `docker compose restart <service>`로 강제 재시작할 것. (`index.html`처럼 Vite가 매 요청마다 디스크에서 직접 읽는 정적 파일은 재시작 없이도 즉시 반영됨.)

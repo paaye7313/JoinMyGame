@@ -48,6 +48,9 @@ export function selectHand(roomCode: string, socketId: string, hand: Hand): Room
 
 export function finishRound(roomCode: string): Room {
   const room = getRoomOrThrow(roomCode);
+  room.players.forEach((p) => {
+    p.ready = false;
+  });
   room.gameState = "RESULT";
   return room;
 }
