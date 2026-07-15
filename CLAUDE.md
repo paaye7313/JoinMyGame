@@ -134,6 +134,8 @@ interface Player {
 type Hand = "scissors" | "rock" | "paper";
 ```
 
+> **UI 순서 규칙**: 카드/이모지 등 화면에 손 모양을 나열할 때는 항상 한국어 관용 순서인 **가위 → 바위 → 보**를 따른다(영어의 "rock-paper-scissors" 순서 아님). 특수카드도 대응 순서(총→중지→거울)로 맞춘다. `frontend/src/game/rps/cards.ts`의 `HAND_CARDS` 배열 순서가 기준.
+
 ---
 
 ## Socket 이벤트 설계

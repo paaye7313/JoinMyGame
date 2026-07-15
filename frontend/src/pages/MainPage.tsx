@@ -74,7 +74,7 @@ function MainPage({ onEnterRoom }: MainPageProps) {
   return (
     <div className="flex w-full max-w-sm flex-1 flex-col items-center justify-center gap-6 px-6 py-10">
       <div className="text-center">
-        <div className="mb-2 text-5xl">✊✌️✋</div>
+        <div className="mb-2 text-5xl">✌️✊✋</div>
         <h1 className="text-3xl font-bold text-text-h">가위바위보 온라인</h1>
       </div>
 

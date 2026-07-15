@@ -121,8 +121,8 @@ function GamePage({ roomCode, players: initialPlayers, winsToMatch, onExit }: Ga
           <span className="font-medium text-text-h">
             {opponent ? nicknameOf(opponent.socketId) : "상대"} 카드
           </span>
-          <span>✊{opponent?.cards.rock ?? 0}</span>
           <span>✌️{opponent?.cards.scissors ?? 0}</span>
+          <span>✊{opponent?.cards.rock ?? 0}</span>
           <span>✋{opponent?.cards.paper ?? 0}</span>
           <span>🎴×{opponent?.specialCardCount ?? 0}</span>
         </div>
