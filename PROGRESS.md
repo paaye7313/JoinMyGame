@@ -58,6 +58,7 @@
   - `frontend/src/types/index.ts`의 `GameResult`에 `drawStack: number` 추가. `GamePage.tsx`에 `drawStack` 로컬 상태 추가(초기값 0, `result`/`rematchStarted` 이벤트로 갱신), 헤더에 "무승부 스택 ●●○" 점 3개짜리 인디케이터 상시 표시(채워진 개수 = 현재 누적 횟수). 리셋 안내 문구를 "3연속 무승부!" → "무승부 {N}회 누적!"으로 수정. 특수카드 규칙 안내(`<details>`)에도 "카드는 무승부여도 소모되고, N번 쌓이면 초기화" 한 줄 추가.
   - `CLAUDE.md`의 `Room` 타입, 매치 규칙 설명, `result`/`gameStarted`/`rematchStarted` 이벤트 표를 전부 갱신(겸사겸사 이벤트 표 중간에 설명 문단이 끼어들어 테이블이 두 조각으로 쪼개져 렌더링되던 기존 포맷 문제도 정리).
   - Playwright로 (1) 무승부 라운드에서 실제로 카드가 1장 소모되는지 (2) 결정 라운드가 껴도 스택이 리셋되지 않고 그대로 유지되는지(연속이 아니라 누적임을 증명) (3) 스택이 2까지 쌓였다가 3번째 무승부에서 리셋 안내와 함께 카드가 원상복구되는지까지 확인. 헤더의 점 인디케이터가 라운드마다 정확히 채워지는 것도 스크린샷으로 확인.
+- ✅ 같은 공유기 내 다른 기기(LAN)와 실제로 플레이 테스트할 수 있도록 설정 정리. 예전엔 `docker-compose.yml`에 `VITE_BACKEND_URL=http://localhost:3000`, `CLIENT_ORIGIN=http://localhost:5173`이 하드코딩돼 있어서, 호스트가 아닌 다른 기기에서 접속하면 그 기기 자신의 localhost를 찾다가 실패(CORS/연결 실패)했음 — 사용자가 "예전에 테스트가 안 됐다"고 기억하던 원인. `docker-compose.yml`을 `${VITE_BACKEND_URL:-http://localhost:3000}` / `${CLIENT_ORIGIN:-http://localhost:5173}` 형태로 바꿔 기본값(솔로 개발 시 localhost)은 그대로 유지하면서, gitignore된 루트 `.env` 파일(이 PC 전용, git엔 안 올라감)에 실제 LAN IP를 넣어 오버라이드하도록 함. 호스트 PC의 이더넷 어댑터 IP를 `Get-NetIPConfiguration`으로 확인(`175.195.8.97`, 서브넷 175.195.8.0/24, Windows 네트워크 프로필 Private — 방화벽 이슈 가능성 낮음 확인). 호스트도 `localhost` 대신 같은 LAN IP로 접속해야 두 기기의 Origin이 동일해져서 CORS가 안 걸림. Playwright로 `http://175.195.8.97:5173`을 통해 실제로 소켓 연결·방 생성이 되는지 확인 완료, 이후 사용자가 실제 모바일 기기로 접속해서 정상 동작 확인함(모바일 반응형 레이아웃도 문제없이 잘 나옴). 원격지(다른 네트워크)에서 테스트하려면 ngrok 같은 터널링이 별도로 필요하다는 점은 안내만 하고 아직 설정 안 함.
 
 ## 2. 현재 진행 중인 작업
 
@@ -73,6 +74,7 @@
 - 익명 볼륨(`/app/node_modules`)은 `docker compose up`으로 재생성해도 이전 컨테이너의 내용을 이어받는 경우가 있으므로, 의존성 관련 이슈 발생 시 `docker compose down -v` 후 재빌드할 것.
 - backend/frontend 모두 로컬 검증용으로 호스트에도 `npm install`이 되어 있음 (`.gitignore`/`.dockerignore`로 제외되므로 컨테이너 빌드에는 영향 없음).
 - (구) Ready 상태는 서버가 상대방의 ready 여부를 별도로 브로드캐스트하지 않았음 — `playersUpdated` 이벤트 추가로 해결됨(위 항목 참고). 이제 `RoomPage`/`GamePage` 모두 서버가 보내주는 `players[].ready`를 그대로 신뢰해서 상대방 상태를 실시간으로 보여줌.
-- 컨테이너는 현재 실행 중 (`docker compose up -d` 상태, Tailwind 의존성 반영을 위해 `down -v` 후 `--build`로 재기동함) — 필요시 `docker compose down`.
+- 컨테이너는 현재 실행 중 (`docker compose up -d` 상태) — 필요시 `docker compose down`.
+- 루트 `.env`(gitignore됨, 이 PC 전용)에 `VITE_BACKEND_URL=http://175.195.8.97:3000`, `CLIENT_ORIGIN=http://175.195.8.97:5173`이 들어있어서, 지금은 컨테이너가 **LAN 접속용 설정**으로 떠 있는 상태(호스트도 `localhost:5173` 대신 `http://175.195.8.97:5173`로 접속해야 함). 나중에 순수 로컬(솔로) 개발로 돌아가려면 `.env`를 지우거나 값을 비우면 `docker-compose.yml`의 기본값(`localhost`)으로 돌아감. 이 IP는 DHCP라 재부팅/재접속 시 바뀔 수 있음 — 안 되면 PowerShell `Get-NetIPConfiguration`으로 이더넷 IPv4 다시 확인해서 `.env` 갱신할 것.
 - gh CLI가 로컬에 없었어서 winget으로 설치 후 `gh auth login`으로 로그인, `gh repo create --source=. --push`로 저장소 생성과 첫 푸시를 한 번에 진행함.
 - Windows 바인드 마운트에서는 `tsx watch`(backend)와 Vite HMR(frontend) 모두 파일 변경 감지를 놓치는 경우가 있었음 — 코드 수정 후 브라우저/API에 반영이 안 되면 `docker compose restart <service>`로 강제 재시작할 것. (`index.html`처럼 Vite가 매 요청마다 디스크에서 직접 읽는 정적 파일은 재시작 없이도 즉시 반영됨.)
