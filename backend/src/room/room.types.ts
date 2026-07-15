@@ -7,6 +7,8 @@ export interface Player {
   nickname: string;
   ready: boolean;
   selectedHand: Hand | null;
+  wins: number;
+  cards: Record<Hand, number>;
 }
 
 export interface Room {
@@ -14,4 +16,6 @@ export interface Room {
   gameType: string;
   players: Player[];
   gameState: GameState;
+  drawStack: number;
+  winsToMatch: number;
 }

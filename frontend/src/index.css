@@ -1,15 +1,28 @@
+@import "tailwindcss";
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
+  --text: #6b6a76;
+  --text-h: #2d2a3a;
+  --bg: #fffaf6;
+  --panel: #ffffff;
+  --border: #ecdff5;
   --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
+
+  --primary: #a78bfa;
+  --primary-bg: #f3e8ff;
+  --primary-border: #d8b4fe;
+
+  --secondary: #34d399;
+  --secondary-bg: #d1fae5;
+
+  --peach: #fb923c;
+  --peach-bg: #ffedd5;
+
+  --danger: #f87171;
+  --danger-bg: #fee2e2;
+
   --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+    rgba(167, 139, 250, 0.18) 0 10px 25px -5px, rgba(45, 42, 58, 0.06) 0 4px 6px -2px;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -32,80 +45,106 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
+    --text: #c9c5d6;
+    --text-h: #f3f0fa;
+    --bg: #1c1a24;
+    --panel: #242231;
+    --border: #3a3650;
     --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
+    --primary: #c4b5fd;
+    --primary-bg: rgba(196, 181, 253, 0.15);
+    --primary-border: rgba(196, 181, 253, 0.4);
+
+    --secondary: #6ee7b7;
+    --secondary-bg: rgba(110, 231, 183, 0.12);
+
+    --peach: #fdba74;
+    --peach-bg: rgba(253, 186, 116, 0.12);
+
+    --danger: #fca5a5;
+    --danger-bg: rgba(252, 165, 165, 0.12);
+
+    --shadow:
+      rgba(0, 0, 0, 0.45) 0 10px 25px -5px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
   }
 }
 
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-h: var(--text-h);
+
+  --color-primary: var(--primary);
+  --color-primary-bg: var(--primary-bg);
+  --color-primary-border: var(--primary-border);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-bg: var(--secondary-bg);
+
+  --color-peach: var(--peach);
+  --color-peach-bg: var(--peach-bg);
+
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+
+  --font-sans: var(--sans);
+  --font-heading: var(--heading);
+  --font-mono: var(--mono);
+
+  --shadow-panel: var(--shadow);
 }
 
 body {
   margin: 0;
+  background: var(--bg);
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
+code {
   font-family: var(--mono);
   display: inline-flex;
   border-radius: 4px;
   color: var(--text-h);
-}
-
-code {
   font-size: 15px;
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+}
+
+/* 카드 뒤집기 연출: Tailwind엔 3D flip 유틸리티가 없어 최소한의 커스텀 CSS로 처리 */
+.flip-card {
+  perspective: 1000px;
+}
+
+.flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.flip-card.is-flipped .flip-card-inner {
+  transform: rotateY(180deg);
+}
+
+.flip-card-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.flip-card-front {
+  transform: rotateY(180deg);
 }

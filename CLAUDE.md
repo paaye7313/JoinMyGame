@@ -101,6 +101,8 @@ interface Room {
   gameType: string;       // "rps" | 향후 "omok" 등 확장 대비
   players: Player[];
   gameState: GameState;
+  drawStack: number;       // 누적 무승부 횟수 (연속일 필요 없음, 카드 리셋 트리거용) — DRAWS_TO_RESET(=3)에 도달하면 양쪽 카드 초기화 + 0으로 리셋
+  winsToMatch: number;     // 매치 승리에 필요한 승수 — 2(3판 2선승) 또는 3(5판 3선승, 기본값)
 }
 ```
 
@@ -112,8 +114,19 @@ interface Player {
   nickname: string;       // 임시 닉네임 (로그인 없음)
   ready: boolean;
   selectedHand: Hand | null;
+  wins: number;           // 현재 매치 내 라운드 승수
+  cards: Record<Hand, number>; // 보유 카드 수량 (특수카드 시스템, 아래 참고)
 }
 ```
+
+### 매치(Match) 규칙
+
+- 한 라운드 = 가위/바위/보(또는 특수카드) 1회 판정. 한 매치 = **`room.winsToMatch`만큼 먼저 승리**하면 종료.
+- 경기 방식은 대기실(`RoomPage`)에서 두 값 중 선택 가능: `winsToMatch=2`(3판 2선승) / `winsToMatch=3`(5판 3선승, **기본값**). 어느 플레이어든 변경 가능하며, 변경 시 양쪽 Ready 상태가 초기화됨(`setMatchFormat` 이벤트).
+- 무승부 라운드는 승수에 반영되지 않고 그대로 다음 라운드로 이어짐(둘 다 승수 그대로 재도전). 단, **카드는 승/패/무 구분 없이 낼 때마다 소모됨** — 무승부라고 카드가 아끼지진 않음.
+- 무승부가 `room.drawStack` 기준 **누적 3회**(연속일 필요 없음, `DRAWS_TO_RESET`)가 되면 양쪽 카드가 매치 시작 상태(기본 각 2장 + 무작위 특수 1장)로 통째로 초기화되고 `drawStack`도 0으로 리셋(승점은 안 건드림) — 카드 소모가 무승부에도 적용되면서 생긴 고갈 위험을 막는 안전장치. 매치가 끝나고 새 매치가 시작될 때도 `drawStack`은 0으로 리셋됨.
+- `room.service.ts`의 `DEFAULT_WINS_TO_MATCH`(=3)/`ALLOWED_WINS_TO_MATCH`(=[2,3]) 상수로 관리, `isMatchOver(room)`이 `room.winsToMatch` 기준으로 매치 종료 여부 판단.
+- 매치가 끝난 뒤 양측이 재경기에 동의하면(`rematch`) 두 플레이어의 `wins`가 0으로 초기화되고 새 매치 시작. 매치 도중(아직 결판 안 남) 양측이 동의하면 `wins`는 유지된 채 다음 라운드로만 진행.
 
 ### Hand (RPS 전용)
 
@@ -134,17 +147,24 @@ type Hand = "scissors" | "rock" | "paper";
 | `ready` | `{ roomCode }` | Ready 상태 전환 |
 | `selectHand` | `{ roomCode, hand }` | 손 선택 |
 | `rematch` | `{ roomCode }` | 재경기 요청 |
+| `leaveRoom` | — | 방 나가기 요청 (자발적으로 나가는 경우; 연결 종료 시엔 `disconnect`가 동일 로직을 처리) |
+| `setMatchFormat` | `{ roomCode, winsToMatch }` | 경기 방식 변경 요청 (2 또는 3만 허용, 대기실에서만 의미 있음) |
 
 ### Server → Client
 
 | 이벤트 | 페이로드 | 설명 |
 |---|---|---|
-| `roomCreated` | `{ roomCode }` | 방 생성 완료 |
-| `playerJoined` | `{ players }` | 상대방 입장 알림 |
-| `gameStarted` | — | 두 플레이어 모두 Ready, 게임 시작 |
-| `result` | `{ winner, hands }` | 승패 결과 |
-| `rematchStarted` | — | 재경기 시작 |
+| `roomCreated` | `{ roomCode, winsToMatch }` | 방 생성 완료 |
+| `playerJoined` | `{ players, winsToMatch }` | 상대방 입장 알림 |
+| `playersUpdated` | `{ players }` | 플레이어 상태(ready 등) 변경 시 전체 목록 브로드캐스트 (Ready/재경기 동의 실시간 표시용) |
+| `playerLeft` | `{ players }` | 상대방 연결 종료로 방을 나감 (남은 플레이어를 대기실로 되돌리는 용도) |
+| `matchFormatUpdated` | `{ winsToMatch }` | 경기 방식(3판 2선승/5판 3선승)이 변경됨 — 대기실에 있는 양쪽에 브로드캐스트 |
+| `gameStarted` | `{ players, winsToMatch, drawStack }` | 두 플레이어 모두 Ready, 게임 시작. payload를 실어 보내는 이유: 클라이언트가 자신의 로컬 상태(클로저)에 의존하면 다른 이벤트와 연달아 도착할 때 리액트 상태 반영 전 값을 읽는 경쟁 상태가 생길 수 있어, 항상 이 payload를 신뢰해야 함 |
+| `result` | `{ winner, hands, winsDelta, scores, matchOver, cardsReset, drawStack }` | 라운드 결과. `scores`는 `{ socketId: 승수 }`, `matchOver`는 이 라운드로 매치가 끝났는지, `cardsReset`은 이 라운드로 무승부 누적이 `DRAWS_TO_RESET`에 도달해 양쪽 카드가 초기화됐는지, `drawStack`은 갱신된 누적 무승부 횟수 |
+| `rematchStarted` | `{ drawStack }` | 재경기(또는 다음 라운드) 시작. 새 매치가 시작된 경우 `drawStack`은 0 |
 | `error` | `{ message }` | 에러 전달 |
+
+`players`가 실리는 모든 이벤트(`playerJoined`/`playersUpdated`/`playerLeft`/`gameStarted`)는 **수신자별로 다른 payload**를 보냄(`socket/index.ts`의 `broadcastPlayers`/`toWirePlayers`) — 본인 항목은 `cards`가 정확한 값 그대로, 상대방 항목은 기본카드(가위/바위/보)만 정확하고 특수카드(총/중지/거울) 수량은 0으로 가려진 채 대신 `specialCardCount`(상대가 들고 있는 특수카드 총 개수)만 별도로 옴. 상대가 카드를 소모하는 걸 보고 전략을 짤 수 있게 하되, 어떤 특수카드를 들고 있는지는 실제로 낼 때까지 숨기기 위함.
 
 ---
 
