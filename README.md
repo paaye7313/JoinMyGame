@@ -91,7 +91,15 @@ docker compose up --build
 - Frontend: http://localhost:5173
 - Backend: http://localhost:3000 (헬스체크: `/health`)
 
-같은 네트워크의 다른 기기(친구, 모바일 등)와 테스트하려면 루트에 `.env` 파일을 만들어 `VITE_BACKEND_URL`/`CLIENT_ORIGIN`을 이 PC의 LAN IP로 오버라이드하면 됩니다 (`docker-compose.yml` 참고).
+같은 네트워크의 다른 기기(친구, 모바일 등)와 테스트하려면 루트에 `.env` 파일을 만들어 `VITE_BACKEND_URL`/`CLIENT_ORIGIN`을 호스트의 LAN(또는 공인) IP로 오버라이드하면 됩니다 (`docker-compose.yml` 참고).
+
+### 라즈베리파이 배포 (외부망 접속)
+
+현재 개발/실행 호스트를 라즈베리파이로 옮겨서 운영 중입니다. 라즈베리파이가 공인 IP를 직접 할당받는 환경이라 별도 포트포워딩 없이 외부망(다른 네트워크, 모바일 데이터 등)에서도 접속 가능합니다.
+
+- `.env`의 `VITE_BACKEND_URL`/`CLIENT_ORIGIN`을 라즈베리파이의 공인 IP로 설정
+- `ufw`로 22(SSH)/3000(backend)/5173(frontend)만 허용, 나머지 인바운드 차단
+- `fail2ban`으로 SSH 브루트포스 자동 차단 (SSH는 키 기반 인증 사용)
 
 ## 기술 스택
 
