@@ -79,7 +79,19 @@ function RoomPage({ roomCode, initialPlayers, initialWinsToMatch, onGameStart, o
   }
 
   async function handleCopyCode() {
-    await navigator.clipboard.writeText(roomCode);
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(roomCode);
+    } else {
+      const textarea = document.createElement("textarea");
+      textarea.value = roomCode;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
