@@ -1,6 +1,7 @@
 services:
   frontend:
     build: ./frontend
+    restart: unless-stopped
     ports:
       - "5173:5173"
     volumes:
@@ -13,6 +14,7 @@ services:
 
   backend:
     build: ./backend
+    restart: unless-stopped
     ports:
       - "3000:3000"
     volumes:
