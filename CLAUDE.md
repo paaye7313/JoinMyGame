@@ -285,3 +285,7 @@ DB/로그인이 없는 MVP 특성상 신고·차단 대신 서버(`backend/src/c
 - 실시간 액션 게임
 
 Room 관리, Socket 통신, 플레이어 관리 코드는 모든 게임에서 공유합니다.
+
+### Phaser 엔진 도입 검토 (실험적, `/phaser-test`)
+
+캐릭터가 움직이는 2D 액션/아케이드 게임을 다음 확장으로 구상 중이라, Phaser 3 계열 엔진(현재 설치된 건 API 호환되는 Phaser 4)을 미리 검증해보기 위해 가위바위보를 Phaser로 이식한 **품질 테스트 전용 페이지**를 `/phaser-test` 경로에 병렬로 만들어둠(`frontend/src/pages/PhaserGamePage.tsx`, `frontend/src/game/rps/phaser/PlayZoneScene.ts`, `frontend/src/game/rps/components/PhaserPlayZone.tsx`). 정식 기능이 아니라 `MainPage`에는 노출되지 않고, 기존 `GamePage`/`RoomPage`/`MainPage`는 전혀 수정하지 않았음 — 판단이 서면 `GamePage`를 이 방식으로 교체하거나, 마음에 안 들면 이 파일들만 삭제하면 됨. React(상태/이벤트) ↔ Phaser(자체 캔버스/게임 루프) 브릿지 패턴은 `PhaserPlayZone.tsx` 참고.

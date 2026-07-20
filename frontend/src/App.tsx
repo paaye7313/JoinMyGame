@@ -3,6 +3,7 @@ import { useSocket } from "./hooks/useSocket";
 import GamePage from "./pages/GamePage";
 import JoinInvitePage from "./pages/JoinInvitePage";
 import MainPage from "./pages/MainPage";
+import PhaserGamePage from "./pages/PhaserGamePage";
 import RoomPage from "./pages/RoomPage";
 import type { ChatMessage, Player } from "./types";
 
@@ -25,6 +26,9 @@ function initialScreen(): Screen {
 function App() {
   const socket = useSocket();
   const [screen, setScreen] = useState<Screen>(initialScreen);
+  // 실험적 Phaser 이식 품질 테스트 전용 플래그(/phaser-test로 접속했을 때만 켜짐, GamePage 로직/화면은 그대로 두고 렌더링만 교체).
+  // pushState로 주소가 이후 /room/{code}로 바뀌어도 이 값 자체는 마운트 시점에 캡처된 그대로 유지됨.
+  const [usePhaserRenderer] = useState(() => window.location.pathname === "/phaser-test");
   const [toast, setToast] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
@@ -118,16 +122,26 @@ function App() {
           onExit={handleExit}
         />
       )}
-      {screen.name === "game" && (
-        <GamePage
-          roomCode={screen.roomCode}
-          players={screen.players}
-          winsToMatch={screen.winsToMatch}
-          messages={messages}
-          onSendMessage={(message) => handleSendMessage(screen.roomCode, message)}
-          onExit={handleExit}
-        />
-      )}
+      {screen.name === "game" &&
+        (usePhaserRenderer ? (
+          <PhaserGamePage
+            roomCode={screen.roomCode}
+            players={screen.players}
+            winsToMatch={screen.winsToMatch}
+            messages={messages}
+            onSendMessage={(message) => handleSendMessage(screen.roomCode, message)}
+            onExit={handleExit}
+          />
+        ) : (
+          <GamePage
+            roomCode={screen.roomCode}
+            players={screen.players}
+            winsToMatch={screen.winsToMatch}
+            messages={messages}
+            onSendMessage={(message) => handleSendMessage(screen.roomCode, message)}
+            onExit={handleExit}
+          />
+        ))}
     </>
   );
 }

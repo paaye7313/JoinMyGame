@@ -84,6 +84,14 @@
   - 로컬 dev 서버(포트 3100) + socket.io-client로 직접 Node 스크립트 작성해 검증: (1) 동일 IP로 21번째 연결 시도부터 `connect_error`("너무 많은 연결 시도입니다") 발생 (2) 같은 소켓으로 `createRoom`을 11번째 호출부터 `error`("너무 많은 요청입니다") 발생, 1~10번째는 정상 `roomCreated` — 둘 다 통과. 디버깅 중 테스트 스크립트가 처음엔 통과 못 했는데, 원인은 리미터 로직이 아니라 이전 세션에서 백그라운드로 띄워둔 구버전 백엔드 프로세스가 포트를 물고 있어 코드 변경이 반영 안 된 것이었음(`netstat`/`taskkill`로 정리 후 재검증). `tsc --noEmit`(backend)/`tsc -b`/`oxlint`/`vite build`(frontend) 전부 통과.
   - `CLAUDE.md`에 "연결/요청 제한" 절 신설.
 - ✅ 같은 방에 동일 닉네임이 들어오면 자동으로 구분자 부여. "같은 닉네임이 한 방에 있으면 어떻게 되는지" 질문에서 시작 — 확인해보니 중복 검사가 전혀 없었고(서버는 `socketId`로만 구분해서 당장 게임 로직은 안 깨졌지만), 나중에 3인 이상 게임을 추가하면 화면에 동명이인이 여럿 뜨는 혼란이 생길 수 있어 미리 처리. `room.service.ts`에 `dedupeNickname(existingNicknames, nickname)` 추가 — 이미 있는 닉네임이면 `(2)`부터 시작해 비어있는 번호를 찾을 때까지 증가시키는 방식(예: "(2)"도 이미 있으면 "(3)"으로), 인원이 몇 명이든 그대로 동작하도록 설계. `joinRoom`에서 새 플레이어를 방에 추가하기 직전에 이 함수로 최종 닉네임을 계산해서 사용(`createRoom`은 항상 빈 방의 첫 플레이어라 충돌 자체가 불가능해 손 안 댐). 프론트엔드는 변경 없음 — `playerJoined` 이벤트의 `players` 배열에 이미 최종(구분자 붙은) 닉네임이 실려오므로 자동 반영됨. socket.io-client로 로컬 dev 서버에 직접 검증: 같은 닉네임("테스트")으로 두 번째 참가 시 "테스트 (2)"가 되는지 확인 완료. `tsc --noEmit` 통과. `CLAUDE.md`의 `Player` 설명에 한 줄 추가.
+- ✅ **[실험적, 정식 기능 아님]** 가위바위보를 Phaser 3로 이식한 품질 테스트 페이지(`/phaser-test`) 추가. 다음 게임(2D 액션/아케이드, 캐릭터 이동/스프라이트 애니메이션 필요)에 Phaser 엔진을 도입할지 미리 가늠해보기 위한 프로토타입 — 사용자가 범위를 "기존 `GamePage`는 절대 안 건드리고, 같은 socket 이벤트를 쓰는 별도 페이지로 병렬 구축"으로 확정. `npm install phaser`(frontend, `^4.2.1` 설치됨 — Phaser 4는 API가 기존에 알려진 Phaser 3와 거의 동일해서 `Scene`/`GameObjectFactory`/`Tweens` 등 마이그레이션 이슈 없음, 다만 `SceneManager`에 `getScene()` 같은 헬퍼는 없어서 `game.scene.keys["씬이름"]`으로 인스턴스를 직접 가져와야 함을 타입 선언 파일 확인으로 알아냄).
+  - 신규 `frontend/src/game/rps/phaser/PlayZoneScene.ts`: 카드 아트 에셋 없이 이모지(`add.text`)+사각형(`add.rectangle`)만으로 카드 그리기, 보유 카드 선택 그리드 + 대결 슬롯 + 뒤집기 연출(스케일X 0→복귀 트윈)까지 한 Scene에서 처리. `syncState(state)` 하나로 매번 전체 다시 그리는 방식(카드 개수가 적어서 성능 문제 없음, React 쪽에서 상태 동기화 로직을 단순하게 유지하기 위한 선택).
+  - 신규 `frontend/src/game/rps/components/PhaserPlayZone.tsx`: React ↔ Phaser 브릿지. 마운트 시 1회 `Phaser.Game` 생성/언마운트 시 `destroy(true)`, 이후 props 변경마다 별도 `useEffect`가 `scene.syncState(...)` 호출해서 동기화(Phaser엔 리액트식 리렌더가 없어 명령형으로 밀어넣는 표준 패턴).
+  - 신규 `frontend/src/pages/PhaserGamePage.tsx`: 기존 `GamePage.tsx`의 socket 구독/승점/무승부스택/상대카드현황/채팅 로직을 그대로 재사용하고, `<PlayZone>` + 손패 선택 그리드 부분만 `<PhaserPlayZone>`으로 교체(주변 UI는 품질 테스트 대상이 아니라 그대로 둠).
+  - `App.tsx`: 마운트 시 `window.location.pathname === "/phaser-test"`를 1회 캡처하는 `usePhaserRenderer` 플래그만 추가(기존 초대 링크 캡처와 동일 패턴, 이후 `pushState`로 주소가 바뀌어도 값 유지), `screen.name === "game"`일 때 이 플래그로 `GamePage`/`PhaserGamePage`를 분기. `MainPage`/`RoomPage`/`GamePage`는 한 줄도 안 건드림. `/phaser-test`는 `MainPage`에 노출 안 하는 URL 전용 진입점 — 초대 링크(`/room/{code}`)는 항상 일반 모드로 열리므로, 둘이 같이 테스트하려면 양쪽 다 `/phaser-test`로 들어가서 방 코드를 수동 입력해야 함(정식 기능이 아니라 이 한계는 그대로 둠).
+  - Docker로 배포할 땐 `phaser`가 새 의존성이라 다음엔 `docker compose up --build`가 필요함(기존 Tailwind 추가 때와 같은 케이스, PC/파이 양쪽 다 마찬가지).
+  - Docker Desktop이 이번에도 계속 꺼져있어서 로컬 dev 서버(포트 3100/5273)로 Playwright 검증: 두 브라우저 컨텍스트로 `/phaser-test` 접속 → 방 생성/수동 코드 참가 → 양쪽 Ready → Phaser 캔버스가 마운트되는지 → 캔버스 안 카드를 실제로 클릭하면 `selectHand`가 나가서 상대 대기 문구가 뜨는지 → 양쪽 다 선택 후 `result` 수신 시 결과 패널(승/패/무 + 재경기 버튼)이 뜨는지 → 콘솔/페이지 에러 없는지, 전부 통과. 스크린샷으로 실제 카드 뒤집기/테두리 색(승/패/무) 렌더링을 사용자가 직접 볼 수 있게 확인 — 선택 그리드가 사라진 자리에 빈 공간이 남는 등 레이아웃은 아직 거친 1차 프로토타입 수준(품질 검증이 목적이라 다듬지 않음). `tsc -b`/`oxlint`/`vite build` 통과(Phaser 때문에 번들 크기 500KB 경고 발생 — 예상된 트레이드오프, 이 실험 라우트만의 문제라 code-splitting 등은 하지 않음).
+  - 마음에 안 들면 이 5개 파일(`PlayZoneScene.ts`, `PhaserPlayZone.tsx`, `PhaserGamePage.tsx`, `App.tsx`의 분기, `phaser` 의존성)만 지우면 기존 게임엔 전혀 영향 없음.
 
 ## 2. 현재 진행 중인 작업
 
@@ -92,6 +100,7 @@
 ## 3. 앞으로 해야 할 작업
 
 - ⬜ (필요 시) MVP 이후 확장: 묵찌빠, 오목, 카드게임 등 `game/` 하위 신규 게임 추가
+- ⬜ `/phaser-test` 품질 테스트 결과에 따라: 마음에 들면 `GamePage`를 Phaser 버전으로 교체하거나, 마음에 안 들면 관련 파일 삭제 — 아직 사용자 판단 전.
 
 ## 4. 현재 이슈나 메모
 
