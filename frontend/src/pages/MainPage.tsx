@@ -3,6 +3,7 @@ import { useSocket } from "../hooks/useSocket";
 import type { Player } from "../types";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
+import { loadNickname, saveNickname } from "../nickname";
 
 interface MainPageProps {
   onEnterRoom: (roomCode: string, players: Player[], winsToMatch: number) => void;
@@ -13,7 +14,7 @@ const INPUT_CLASS =
 
 function MainPage({ onEnterRoom }: MainPageProps) {
   const socket = useSocket();
-  const [nickname, setNickname] = useState("");
+  const [nickname, setNickname] = useState(loadNickname);
   const [roomCodeInput, setRoomCodeInput] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -59,6 +60,7 @@ function MainPage({ onEnterRoom }: MainPageProps) {
       return;
     }
     setErrorMessage("");
+    saveNickname(nickname.trim());
     socket.emit("createRoom", { nickname });
   }
 
@@ -68,6 +70,7 @@ function MainPage({ onEnterRoom }: MainPageProps) {
       return;
     }
     setErrorMessage("");
+    saveNickname(nickname.trim());
     socket.emit("joinRoom", { roomCode: roomCodeInput.trim(), nickname });
   }
 

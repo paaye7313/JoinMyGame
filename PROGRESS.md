@@ -67,6 +67,15 @@
   - 프론트: `types/index.ts`에 `ChatMessage` 타입 추가, 공유 UI 레이어에 `components/Chat/ChatBox.tsx`(메시지 목록 + `maxLength=200` input + 글자수 카운터 + 전송) 신규 작성. `App.tsx`가 최상위에서 `chatMessage` 이벤트를 한 번만 구독해 `messages` state를 관리(기존 `playerLeft` 토스트와 같은 위치/패턴), `RoomPage`/`GamePage`에 `messages`/`onSendMessage` props로 내려줘서 대기실→게임 화면 전환에도 채팅 기록이 그대로 유지됨(방 나가기 시엔 초기화).
   - Docker가 이 세션 동안 계속 안 떠서(Docker Desktop 미기동), 로컬에 이미 설치돼 있던 `node_modules`로 백엔드(`tsx`)/프론트(`vite`)를 대체 포트(3100/5273)에 직접 띄워 검증. `playwright-core`를 저장소 루트에 임시 설치(`--no-save`, 테스트 후 삭제)하고 이전 세션이 남겨둔 로컬 캐시 Chromium(`ms-playwright/chromium-1228`)을 재사용해 두 브라우저 컨텍스트로 (1) 정상 메시지 송수신 (2) 대기실→게임 화면 전환 후에도 채팅 기록 유지 (3) 클라이언트 `maxLength`를 DOM 조작으로 우회해도 서버가 200자 초과를 거부 (4) 500ms 이내 연속 전송 시 쿨다운 에러 (5) 동일 메시지 3회 연속 시 도배 차단 — 5개 전부 통과 확인. `tsc -b`(frontend)/`tsc --noEmit`(backend)/`oxlint`/`vite build` 전부 통과.
   - `CLAUDE.md` Client→Server/Server→Client 이벤트 표에 `chatMessage` 추가, "채팅 제한 규칙" 절 신설.
+- ✅ 채팅창이 메시지가 쌓여 스크롤이 생겨도 새 메시지 도착 시 자동으로 하단까지 스크롤되도록 수정(`ChatBox.tsx`에 `listRef` + `messages` 변경 시 `scrollTop = scrollHeight` 적용). 이전엔 직접 스크롤을 내려야만 새 메시지가 보였음. Playwright로 메시지 15개 연속 전송 후 발신자/수신자 양쪽 다 스크롤이 하단에 붙어있는지 확인.
+- ✅ URL로 방 초대 가능하게 변경 + 닉네임 자동/사전 설정. 백엔드는 변경 없음(`room.service.ts`의 `joinRoom`이 이미 "존재하지 않는 방"/"방이 가득 찼습니다" 에러를 던지고 있어서 URL로 들어온 잘못된 초대도 기존 메커니즘으로 처리됨). 화면이 몇 개 안 되는 프로젝트 규모라 `react-router-dom` 없이 `App.tsx`가 `window.location.pathname`을 `/^\/room\/(\d{6})$/`로 파싱하는 수동 라우팅으로 구현(Vite dev 서버가 SPA fallback을 기본 지원해 `/room/123456` 직접 접속도 별도 서버 설정 불필요).
+  - 신규 `frontend/src/nickname.ts`: `localStorage`(`jmg_nickname`)에 닉네임을 저장/재사용(재방문 시 재입력 불필요, 사용자 확정), 저장된 값이 없으면 `손님{4자리 랜덤 숫자}` 임시 닉네임을 자동 생성해 채움.
+  - 신규 `frontend/src/pages/JoinInvitePage.tsx`: URL 초대 전용 화면(방 생성/코드 입력 UI 없이 닉네임 확인 후 바로 "입장하기"). `MainPage.tsx`의 기존 `joinRoom`/`error` 이벤트 구독 패턴을 그대로 재사용. 방이 없거나 가득 찼을 때도 기존 에러 문구 + "메인으로" 탈출 버튼으로 처리.
+  - `MainPage.tsx`: 닉네임 입력 초기값을 빈 문자열에서 `loadNickname()`으로 변경(임시 닉네임이 미리 채워짐, 수정 가능), 생성/참가 성공 시 `saveNickname()` 호출.
+  - `App.tsx`: `Screen`에 `invite` 분기 추가, 마운트 시 URL을 파싱해 초기 화면 결정. 방 생성/참가/초대 입장 시 `enterRoom()` 헬퍼가 `history.pushState`로 주소를 `/room/{code}`로 갱신, 나가기 시 `/`로 복원. 뒤로가기(`popstate`)로 화면을 복원하는 로직은 의도적으로 넣지 않음(새로고침 시 세션이 사라지는 기존 구조와 일관성 유지, URL은 순수 공유용).
+  - `RoomPage.tsx`: 방 코드 복사 버튼이 이제 6자리 코드가 아니라 전체 초대 URL(`origin + /room/{code}`)을 클립보드에 복사하도록 변경(기존 HTTP 환경 폴백 로직은 그대로 재사용), 안내 문구를 "탭해서 초대 링크 복사"로 수정.
+  - Docker 대신 로컬 dev 서버(포트 3100/5273)로 Playwright 검증: (1) 방 생성 시 주소가 `/room/<code>`로 바뀌는지 (2) 복사 버튼이 전체 URL을 복사하는지 (3) 그 URL을 새 브라우저 컨텍스트로 직접 열면 닉네임이 임시값(`손님####`)으로 미리 채워진 확인 화면이 뜨는지 (4) 거기서 입장하면 정상적으로 대기실에 합류하는지 (5) 존재하지 않는 코드로 직접 URL 접속 시 에러 + "메인으로" 버튼으로 탈출되는지 (6) 닉네임을 바꾸고 새로고침해도 localStorage로 유지되는지 — 총 10개 항목 전부 통과. `tsc -b`/`oxlint`/`vite build` 통과.
+  - `CLAUDE.md`에 "방 초대 URL / 닉네임" 절 신설, 게임 진행 플로우 다이어그램에 URL 초대 경로 추가.
 
 ## 2. 현재 진행 중인 작업
 

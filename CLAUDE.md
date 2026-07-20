@@ -189,6 +189,10 @@ DB/로그인이 없는 MVP 특성상 신고·차단 대신 서버(`backend/src/c
   ├── 방 만들기 → 6자리 코드 생성 → 상대 대기
   └── 방 참가  → 코드 입력 → 입장
 
+[URL 초대]
+  /room/{6자리 코드}로 직접 접속 → 닉네임 확인 화면(JoinInvitePage) → 입장하기
+  (방이 없거나 가득 찼으면 기존 joinRoom 에러가 그대로 표시되고 "메인으로"로 탈출)
+
 [대기실]
   두 플레이어 모두 Ready → gameStarted 이벤트
 
@@ -199,6 +203,12 @@ DB/로그인이 없는 MVP 특성상 신고·차단 대신 서버(`backend/src/c
 [결과]
   두 플레이어 모두 Rematch Ready → rematchStarted → 게임 재시작
 ```
+
+### 방 초대 URL / 닉네임
+
+- 방 생성/참가 시 브라우저 주소가 `history.pushState`로 `/room/{roomCode}`로 바뀌고, 대기실의 방 코드 버튼을 탭하면 이 전체 URL이 클립보드에 복사됨(기존엔 6자리 코드만 복사했음). 이 URL을 그대로 열면 `JoinInvitePage`(닉네임 확인 후 입장 전용 화면)로 진입.
+- 별도 라우팅 라이브러리 없이 `App.tsx`가 `window.location.pathname`을 `/^\/room\/(\d{6})$/`로 파싱하는 수동 방식(화면이 몇 개 안 되는 프로젝트 규모 고려). 뒤로가기(`popstate`)로 이전 화면을 복원하는 로직은 의도적으로 없음 — 새로고침 시 세션이 사라지는 기존 구조(DB 없음)와 일관되게, URL은 공유 링크 용도로만 정확히 유지됨.
+- 닉네임은 `frontend/src/nickname.ts`가 `localStorage`(`jmg_nickname`)에 저장/재사용. 저장된 값이 없으면 `손님{4자리 랜덤 숫자}` 형식의 임시 닉네임을 자동 생성해 채워두고, 방 생성/참가/초대 입장 시점에 입력한 값으로 갱신됨.
 
 ---
 

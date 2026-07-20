@@ -1,18 +1,30 @@
 import { useEffect, useState } from "react";
 import { useSocket } from "./hooks/useSocket";
 import GamePage from "./pages/GamePage";
+import JoinInvitePage from "./pages/JoinInvitePage";
 import MainPage from "./pages/MainPage";
 import RoomPage from "./pages/RoomPage";
 import type { ChatMessage, Player } from "./types";
 
 type Screen =
   | { name: "main" }
+  | { name: "invite"; roomCode: string }
   | { name: "room"; roomCode: string; players: Player[]; winsToMatch: number }
   | { name: "game"; roomCode: string; players: Player[]; winsToMatch: number };
 
+function matchInviteRoomCode(pathname: string): string | null {
+  const match = pathname.match(/^\/room\/(\d{6})$/);
+  return match ? match[1] : null;
+}
+
+function initialScreen(): Screen {
+  const inviteRoomCode = matchInviteRoomCode(window.location.pathname);
+  return inviteRoomCode ? { name: "invite", roomCode: inviteRoomCode } : { name: "main" };
+}
+
 function App() {
   const socket = useSocket();
-  const [screen, setScreen] = useState<Screen>({ name: "main" });
+  const [screen, setScreen] = useState<Screen>(initialScreen);
   const [toast, setToast] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
@@ -30,6 +42,12 @@ function App() {
   function handleExit() {
     setMessages([]);
     setScreen({ name: "main" });
+    history.pushState(null, "", "/");
+  }
+
+  function enterRoom(roomCode: string, players: Player[], winsToMatch: number) {
+    setScreen({ name: "room", roomCode, players, winsToMatch });
+    history.pushState(null, "", `/room/${roomCode}`);
   }
 
   function handleSendMessage(roomCode: string, message: string) {
@@ -65,11 +83,15 @@ function App() {
           {toast}
         </div>
       )}
-      {screen.name === "main" && (
-        <MainPage
-          onEnterRoom={(roomCode, players, winsToMatch) =>
-            setScreen({ name: "room", roomCode, players, winsToMatch })
-          }
+      {screen.name === "main" && <MainPage onEnterRoom={enterRoom} />}
+      {screen.name === "invite" && (
+        <JoinInvitePage
+          roomCode={screen.roomCode}
+          onJoined={enterRoom}
+          onCancel={() => {
+            setScreen({ name: "main" });
+            history.pushState(null, "", "/");
+          }}
         />
       )}
       {screen.name === "room" && (

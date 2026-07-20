@@ -90,11 +90,12 @@ function RoomPage({
   }
 
   async function handleCopyCode() {
+    const inviteUrl = `${window.location.origin}/room/${roomCode}`;
     if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(roomCode);
+      await navigator.clipboard.writeText(inviteUrl);
     } else {
       const textarea = document.createElement("textarea");
-      textarea.value = roomCode;
+      textarea.value = inviteUrl;
       textarea.style.position = "fixed";
       textarea.style.opacity = "0";
       document.body.appendChild(textarea);
@@ -120,7 +121,7 @@ function RoomPage({
         >
           {roomCode}
         </button>
-        <span className="text-xs text-text">{copied ? "복사됨!" : "탭해서 복사"}</span>
+        <span className="text-xs text-text">{copied ? "링크 복사됨!" : "탭해서 초대 링크 복사"}</span>
       </Card>
 
       <Card className="flex w-full flex-col items-center gap-4">
