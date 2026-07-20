@@ -23,12 +23,23 @@ function initialScreen(): Screen {
   return inviteRoomCode ? { name: "invite", roomCode: inviteRoomCode } : { name: "main" };
 }
 
+// 실험적 Phaser 이식 품질 테스트 진입 방법: /phaser-test 경로(첫 접속용) 또는 ?engine=phaser 쿼리(이후 페이지 이동 시 유지용).
+function isPhaserRequested(): boolean {
+  return (
+    window.location.pathname === "/phaser-test" ||
+    new URLSearchParams(window.location.search).get("engine") === "phaser"
+  );
+}
+
+// pushState로 주소를 바꿀 때 ?engine=phaser를 계속 붙여서, 방 이동/새로고침 후에도 Phaser 모드가 꺼지지 않게 함.
+function withPhaserFlag(path: string, usePhaserRenderer: boolean): string {
+  return usePhaserRenderer ? `${path}?engine=phaser` : path;
+}
+
 function App() {
   const socket = useSocket();
   const [screen, setScreen] = useState<Screen>(initialScreen);
-  // 실험적 Phaser 이식 품질 테스트 전용 플래그(/phaser-test로 접속했을 때만 켜짐, GamePage 로직/화면은 그대로 두고 렌더링만 교체).
-  // pushState로 주소가 이후 /room/{code}로 바뀌어도 이 값 자체는 마운트 시점에 캡처된 그대로 유지됨.
-  const [usePhaserRenderer] = useState(() => window.location.pathname === "/phaser-test");
+  const [usePhaserRenderer] = useState(isPhaserRequested);
   const [toast, setToast] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
@@ -46,12 +57,12 @@ function App() {
   function handleExit() {
     setMessages([]);
     setScreen({ name: "main" });
-    history.pushState(null, "", "/");
+    history.pushState(null, "", withPhaserFlag("/", usePhaserRenderer));
   }
 
   function enterRoom(roomCode: string, players: Player[], winsToMatch: number) {
     setScreen({ name: "room", roomCode, players, winsToMatch });
-    history.pushState(null, "", `/room/${roomCode}`);
+    history.pushState(null, "", withPhaserFlag(`/room/${roomCode}`, usePhaserRenderer));
   }
 
   function handleSendMessage(roomCode: string, message: string) {
@@ -105,7 +116,7 @@ function App() {
           onJoined={enterRoom}
           onCancel={() => {
             setScreen({ name: "main" });
-            history.pushState(null, "", "/");
+            history.pushState(null, "", withPhaserFlag("/", usePhaserRenderer));
           }}
         />
       )}
