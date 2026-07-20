@@ -32,11 +32,25 @@ function PhaserPlayZone(props: PhaserPlayZoneProps) {
 
     const game = new Phaser.Game({
       type: Phaser.AUTO,
-      width: SCENE_WIDTH,
-      height: SCENE_HEIGHT,
       parent: containerRef.current ?? undefined,
       backgroundColor: "#ffffff",
       scene: PlayZoneScene,
+      // 내부 게임 좌표계(PlayZoneScene의 모든 좌표 계산 기준)는 SCENE_WIDTH/HEIGHT 그대로 유지하고,
+      // 화면에 그려지는 크기만 부모 컨테이너 폭에 맞춰 비율 유지하며 축소 — 모바일에서 캔버스가
+      // 뷰포트보다 커서 화면을 넘치던 문제를 씬 좌표 재계산 없이 해결.
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: SCENE_WIDTH,
+        height: SCENE_HEIGHT,
+      },
+      // 터치 스와이프에 preventDefault를 걸지 않게 해서, 캔버스 위에서도 페이지 스크롤이 통과되게 함
+      // (카드 선택은 탭 동작이라 스크롤 통과와 무관하게 그대로 동작).
+      input: {
+        touch: {
+          capture: false,
+        },
+      },
     });
     gameRef.current = game;
 
@@ -67,7 +81,19 @@ function PhaserPlayZone(props: PhaserPlayZoneProps) {
     });
   }, [props.availableCards, props.selfCard, props.selfOutcome, props.opponentCard, props.opponentOutcome, props.revealed]);
 
-  return <div ref={containerRef} className="mx-auto" style={{ width: SCENE_WIDTH, height: SCENE_HEIGHT }} />;
+  return (
+    <div
+      ref={containerRef}
+      className="mx-auto"
+      style={{
+        // 부모(Card 등)가 flex 자식이라 퍼센트(%) 기준 폭이 불확정적이라, 뷰포트(vw) 기준으로 직접 계산해서
+        // 모바일에서도 항상 화면 폭 안에 들어오도록 함(7rem은 페이지/Card 좌우 패딩 합만큼 여유를 둔 값).
+        width: `min(${SCENE_WIDTH}px, calc(100vw - 7rem))`,
+        aspectRatio: `${SCENE_WIDTH} / ${SCENE_HEIGHT}`,
+        touchAction: "pan-y",
+      }}
+    />
+  );
 }
 
 export default PhaserPlayZone;

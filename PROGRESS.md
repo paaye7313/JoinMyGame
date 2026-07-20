@@ -101,6 +101,11 @@
     - 카드 클릭 판정용 히트 영역도 Container 자식 대신 씬 최상위 독립 객체로 분리(원인 조사 중 발견: Playwright 헤드리스 자동화의 CDP 합성 마우스 이벤트가 Phaser의 PointerEvent 입력과 간헐적으로 안 맞아떨어지는 테스트 도구 특유의 이슈였고, 실제 사용자의 진짜 마우스 조작과는 무관함을 별도 스크립트로 확인 — 그래도 Container 중첩을 줄이는 게 더 안전한 패턴이라 그대로 반영).
     - React StrictMode(dev)가 `PhaserPlayZone`의 Phaser.Game 생성 effect를 mount→cleanup→mount로 두 번 실행하면서, 첫 번째(곧 destroy될) 게임의 비동기 READY 콜백이 늦게 도착해 `sceneRef.current`를 죽은 씬으로 덮어쓸 수 있는 경쟁 상태를 발견 — `cancelled` 플래그로 방지(표준 React 패턴).
   - Playwright + 스크린샷으로 매 단계 시각 확인, `tsc -b`/`oxlint`/`vite build` 전부 통과.
+- ✅ `/phaser-test` 모바일 반응형 크기 + 캔버스 위 스크롤 통과. 데스크톱 기준으로 계속 키워온 고정 픽셀 캔버스(480×750)가 모바일 뷰포트보다 넓어서 화면을 넘치고, Phaser가 터치 이벤트에 기본으로 `preventDefault`를 걸어서 캔버스 위에서 스와이프해도 페이지 스크롤이 아예 안 되던 문제. `frontend/src/game/rps/components/PhaserPlayZone.tsx`만 수정(`PlayZoneScene.ts`의 좌표 계산은 그대로 둠):
+  - Phaser `Game` config에 `scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: SCENE_WIDTH, height: SCENE_HEIGHT }` 추가 — 내부 게임 좌표계(480×750)는 그대로 두고 화면에 그려지는 크기만 부모 컨테이너에 맞춰 비율 유지하며 축소.
+  - `input: { touch: { capture: false } }` 추가 + 컨테이너에 `touchAction: "pan-y"` — 터치 스와이프가 더 이상 캔버스에 막히지 않고 페이지 스크롤로 통과됨(카드 선택은 탭이라 영향 없음).
+  - 컨테이너 폭을 `width: "100%"`(퍼센트 기준)로 뒀더니 모바일에서도 안 줄어드는 버그 발견 — 원인은 부모(`Card`)가 flex 자식이라 퍼센트 기준이 되는 폭 자체가 불확정적이었던 것(플렉스박스의 흔한 함정). `width: min(${SCENE_WIDTH}px, calc(100vw - 7rem))`처럼 뷰포트(vw) 기준으로 직접 계산하는 방식으로 바꿔서 부모의 flex 사이징과 무관하게 항상 뷰포트 안에 들어오도록 수정.
+  - Playwright로 모바일 크기 뷰포트(390×844) 컨텍스트를 만들어 (1) 가로 스크롤/넘침 없는지 (2) 캔버스가 실제로 뷰포트에 맞게 축소되는지(480→278px) (3) 캔버스 영역에서 스크롤 제스처 시 페이지가 실제로 스크롤되는지(스크린샷으로 패널/채팅이 보이는지 확인) (4) 카드 탭은 여전히 되는지 (5) 데스크톱 뷰포트에서는 480px 그대로 유지되는지(회귀 없음) 전부 통과. `tsc -b`/`oxlint`/`vite build` 통과.
 
 ## 2. 현재 진행 중인 작업
 
