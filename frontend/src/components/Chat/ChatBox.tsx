@@ -7,9 +7,10 @@ interface ChatBoxProps {
   messages: ChatMessage[];
   selfSocketId: string;
   onSend: (message: string) => void;
+  messageListClassName?: string;
 }
 
-function ChatBox({ messages, selfSocketId, onSend }: ChatBoxProps) {
+function ChatBox({ messages, selfSocketId, onSend, messageListClassName = "max-h-40" }: ChatBoxProps) {
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -28,7 +29,7 @@ function ChatBox({ messages, selfSocketId, onSend }: ChatBoxProps) {
 
   return (
     <div className="flex w-full flex-col gap-2 rounded-2xl border border-border bg-panel p-4 shadow-panel">
-      <div ref={listRef} className="flex max-h-40 flex-col gap-1.5 overflow-y-auto">
+      <div ref={listRef} className={`flex flex-col gap-1.5 overflow-y-auto ${messageListClassName}`}>
         {messages.length === 0 && <p className="text-xs text-text">아직 채팅이 없어요.</p>}
         {messages.map((m) => {
           const isSelf = m.socketId === selfSocketId;

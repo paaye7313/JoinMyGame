@@ -14,8 +14,8 @@ export interface PlayZoneSyncState {
   revealed: boolean;
 }
 
-export const SCENE_WIDTH = 420;
-export const SCENE_HEIGHT = 660;
+export const SCENE_WIDTH = 480;
+export const SCENE_HEIGHT = 750;
 
 const CARD_BG = 0xffffff;
 const CARD_BORDER = 0xd8d2e8;
@@ -27,11 +27,11 @@ const OUTCOME_COLORS: Record<Outcome, number> = {
 };
 const BACK_PATTERN_BG = 0xe6e1f7;
 
-const SLOT_CARD_W = 110;
-const SLOT_CARD_H = 160;
-const SELECTION_CARD_W = 85;
-const SELECTION_CARD_H = 120;
-const SELECTION_GAP = 16;
+const SLOT_CARD_W = 130;
+const SLOT_CARD_H = 190;
+const SELECTION_CARD_W = 100;
+const SELECTION_CARD_H = 145;
+const SELECTION_GAP = 18;
 
 // 위에서부터 상대 슬롯 → 상대 라벨 → VS → 내 슬롯 → 내 라벨 → 선택 그리드 순으로 여백을 계산.
 // 라벨은 항상 자기 카드 "바로 아래"에 오도록 좌표를 맞춰서(기존 HandCard/PlayZone과 같은 배치) 어느 카드가 누구 것인지 헷갈리지 않게 함.
@@ -57,7 +57,7 @@ function drawCardBox(
   container.add(bg);
 
   if (faceDown) {
-    const back = scene.add.text(0, 0, "🎴", { fontSize: "32px" }).setOrigin(0.5);
+    const back = scene.add.text(0, 0, "🎴", { fontSize: "40px" }).setOrigin(0.5);
     container.add(back);
   }
 
@@ -77,14 +77,14 @@ export default class PlayZoneScene extends Phaser.Scene {
 
   create(): void {
     this.add
-      .text(SCENE_WIDTH / 2, VS_Y, "VS", { fontSize: "20px", color: "#7c6fd6", fontStyle: "bold" })
+      .text(SCENE_WIDTH / 2, VS_Y, "VS", { fontSize: "24px", color: "#7c6fd6", fontStyle: "bold" })
       .setOrigin(0.5);
 
     this.opponentLabel = this.add
-      .text(SCENE_WIDTH / 2, OPPONENT_LABEL_Y, "상대", { fontSize: "14px", color: "#6b6478" })
+      .text(SCENE_WIDTH / 2, OPPONENT_LABEL_Y, "상대", { fontSize: "16px", color: "#6b6478" })
       .setOrigin(0.5);
     this.selfLabel = this.add
-      .text(SCENE_WIDTH / 2, SELF_LABEL_Y, "나", { fontSize: "14px", color: "#6b6478" })
+      .text(SCENE_WIDTH / 2, SELF_LABEL_Y, "나", { fontSize: "16px", color: "#6b6478" })
       .setOrigin(0.5);
 
     this.opponentSlot = this.add.container(SCENE_WIDTH / 2, OPPONENT_SLOT_Y);
@@ -120,7 +120,7 @@ export default class PlayZoneScene extends Phaser.Scene {
     if (!card) {
       const box = this.add.rectangle(0, 0, w, h, 0xffffff, 0);
       box.setStrokeStyle(2, CARD_BORDER, 0.6);
-      const q = this.add.text(0, 0, "?", { fontSize: "24px", color: "#c9c2da" }).setOrigin(0.5);
+      const q = this.add.text(0, 0, "?", { fontSize: "28px", color: "#c9c2da" }).setOrigin(0.5);
       slot.add([box, q]);
       return;
     }
@@ -136,9 +136,9 @@ export default class PlayZoneScene extends Phaser.Scene {
     const box = drawCardBox(this, 0, 0, w, h, borderColor, faceDown);
 
     if (!faceDown) {
-      const icon = this.add.text(0, -22, card.icon, { fontSize: "42px" }).setOrigin(0.5);
+      const icon = this.add.text(0, -28, card.icon, { fontSize: "52px" }).setOrigin(0.5);
       const label = this.add
-        .text(0, 38, card.label, { fontSize: "15px", color: "#3a3450", fontStyle: "bold" })
+        .text(0, 46, card.label, { fontSize: "17px", color: "#3a3450", fontStyle: "bold" })
         .setOrigin(0.5);
       box.add([icon, label]);
     }
@@ -168,15 +168,15 @@ export default class PlayZoneScene extends Phaser.Scene {
       const x = startX + i * (w + gap);
       const borderColor = card.category === "special" ? SPECIAL_BORDER : CARD_BORDER;
       const box = drawCardBox(this, x, y, w, h, borderColor, false);
-      const icon = this.add.text(0, -16, card.icon, { fontSize: "30px" }).setOrigin(0.5);
+      const icon = this.add.text(0, -20, card.icon, { fontSize: "36px" }).setOrigin(0.5);
       const label = this.add
-        .text(0, 28, card.label, { fontSize: "13px", color: "#3a3450" })
+        .text(0, 34, card.label, { fontSize: "15px", color: "#3a3450" })
         .setOrigin(0.5);
       box.add([icon, label]);
 
-      const badge = this.add.circle(w / 2 - 8, -h / 2 + 8, 12, 0x7c6fd6);
+      const badge = this.add.circle(w / 2 - 10, -h / 2 + 10, 14, 0x7c6fd6);
       const badgeText = this.add
-        .text(w / 2 - 8, -h / 2 + 8, String(count), { fontSize: "12px", color: "#ffffff" })
+        .text(w / 2 - 10, -h / 2 + 10, String(count), { fontSize: "13px", color: "#ffffff" })
         .setOrigin(0.5);
 
       const hit = this.add.rectangle(x, y, w, h, 0xffffff, 0).setInteractive({ useHandCursor: true });

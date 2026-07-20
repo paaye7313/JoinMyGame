@@ -118,7 +118,7 @@ function PhaserGamePage({
   }));
 
   return (
-    <div className="flex w-full max-w-lg flex-1 flex-col items-center gap-6 px-6 py-10">
+    <div className="flex w-full max-w-5xl flex-1 flex-col items-center gap-6 px-6 py-10">
       <div className="text-center">
         <h1 className="text-2xl font-semibold text-text-h">가위바위보! (Phaser 테스트)</h1>
         <p className="text-sm text-text">
@@ -149,91 +149,100 @@ function PhaserGamePage({
         </div>
       </div>
 
-      <Card className="flex w-full flex-col items-center gap-8 py-10">
-        <PhaserPlayZone
-          availableCards={availableCards}
-          onSelectHand={handleSelectHand}
-          selfCard={selfCard}
-          selfOutcome={selfOutcome}
-          opponentCard={opponentCard}
-          opponentOutcome={opponentOutcome}
-          revealed={!!result}
-        />
-
-        {result ? (
-          <div className="flex flex-col items-center gap-4">
-            <p className="text-lg font-semibold text-text-h">
-              {result.matchOver
-                ? result.winner === socket.id
-                  ? "게임 승리!"
-                  : "게임 패배..."
-                : result.winner === "draw"
-                  ? "무승부!"
-                  : result.winner === socket.id
-                    ? "라운드 승리!"
-                    : "라운드 패배..."}
-              {result.winner !== "draw" && result.winsDelta === 2 && (
-                <span className="ml-2 text-sm font-medium text-peach">특수카드! 2승 획득</span>
-              )}
-            </p>
-
-            {result.cardsReset && (
-              <p className="rounded-full bg-peach-bg px-4 py-1.5 text-sm font-medium text-peach">
-                무승부 {DRAWS_TO_RESET}회 누적! 양쪽 카드가 모두 초기화되었어요
-              </p>
-            )}
-
-            <div className="flex justify-center gap-8">
-              {players.map((p) => (
-                <PlayerAvatar
-                  key={p.socketId}
-                  nickname={p.nickname}
-                  isSelf={p.socketId === socket.id}
-                  status={
-                    <Badge tone={p.ready ? "secondary" : "neutral"}>
-                      {p.ready ? `${continueLabel} 동의` : "대기 중"}
-                    </Badge>
-                  }
-                />
-              ))}
-            </div>
-
-            <div className="flex gap-3">
-              <Button onClick={handleRematch} disabled={self?.ready}>
-                {continueLabel}
-              </Button>
-              <Button variant="secondary" onClick={handleLeave}>
-                나가기
-              </Button>
-            </div>
-          </div>
-        ) : selectedHand ? (
-          <p className="text-sm text-text">상대방의 선택을 기다리는 중...</p>
-        ) : (
-          <details className="w-full rounded-2xl border border-peach-bg bg-peach-bg/40 px-4 py-2 text-text">
-            <summary className="cursor-pointer select-none text-sm font-medium text-text-h">
-              🔫🖕🪞 특수카드가 처음이신가요? 눌러서 규칙 보기
-            </summary>
-            <div className="mt-2 space-y-1 text-xs leading-relaxed text-text">
-              <p>총·중지·거울은 각각 가위·바위·보의 강화판이에요.</p>
-              <p>
-                일반 카드 상대로 <b className="text-text-h">이기면 2승</b>,{" "}
-                <b className="text-text-h">비기면 1승</b>(원래 무승부 → 승리로 전환),{" "}
-                <b className="text-text-h">지면 상대가 2승</b>을 가져가요.
-              </p>
-              <p>특수카드끼리 맞붙으면 원래 가위바위보 규칙(1승/무승부) 그대로예요.</p>
-              <p>
-                카드는 낼 때마다 소모돼요(무승부도 예외 없이 소모). 대신 무승부가{" "}
-                <b className="text-text-h">{DRAWS_TO_RESET}번 쌓이면</b> 양쪽 카드가 전부 초기화돼요.
-              </p>
-            </div>
-          </details>
-        )}
-      </Card>
-
       {errorMessage && <p className="text-sm text-danger">{errorMessage}</p>}
 
-      <ChatBox messages={messages} selfSocketId={socket.id ?? ""} onSend={onSendMessage} />
+      <div className="flex w-full flex-col items-start justify-center gap-6 lg:flex-row">
+        <Card className="flex flex-col items-center gap-8 py-10">
+          <PhaserPlayZone
+            availableCards={availableCards}
+            onSelectHand={handleSelectHand}
+            selfCard={selfCard}
+            selfOutcome={selfOutcome}
+            opponentCard={opponentCard}
+            opponentOutcome={opponentOutcome}
+            revealed={!!result}
+          />
+
+          {result ? (
+            <div className="flex flex-col items-center gap-4">
+              <p className="text-lg font-semibold text-text-h">
+                {result.matchOver
+                  ? result.winner === socket.id
+                    ? "게임 승리!"
+                    : "게임 패배..."
+                  : result.winner === "draw"
+                    ? "무승부!"
+                    : result.winner === socket.id
+                      ? "라운드 승리!"
+                      : "라운드 패배..."}
+                {result.winner !== "draw" && result.winsDelta === 2 && (
+                  <span className="ml-2 text-sm font-medium text-peach">특수카드! 2승 획득</span>
+                )}
+              </p>
+
+              {result.cardsReset && (
+                <p className="rounded-full bg-peach-bg px-4 py-1.5 text-sm font-medium text-peach">
+                  무승부 {DRAWS_TO_RESET}회 누적! 양쪽 카드가 모두 초기화되었어요
+                </p>
+              )}
+
+              <div className="flex justify-center gap-8">
+                {players.map((p) => (
+                  <PlayerAvatar
+                    key={p.socketId}
+                    nickname={p.nickname}
+                    isSelf={p.socketId === socket.id}
+                    status={
+                      <Badge tone={p.ready ? "secondary" : "neutral"}>
+                        {p.ready ? `${continueLabel} 동의` : "대기 중"}
+                      </Badge>
+                    }
+                  />
+                ))}
+              </div>
+
+              <div className="flex gap-3">
+                <Button onClick={handleRematch} disabled={self?.ready}>
+                  {continueLabel}
+                </Button>
+                <Button variant="secondary" onClick={handleLeave}>
+                  나가기
+                </Button>
+              </div>
+            </div>
+          ) : selectedHand ? (
+            <p className="text-sm text-text">상대방의 선택을 기다리는 중...</p>
+          ) : (
+            <details className="w-full rounded-2xl border border-peach-bg bg-peach-bg/40 px-4 py-2 text-text">
+              <summary className="cursor-pointer select-none text-sm font-medium text-text-h">
+                🔫🖕🪞 특수카드가 처음이신가요? 눌러서 규칙 보기
+              </summary>
+              <div className="mt-2 space-y-1 text-xs leading-relaxed text-text">
+                <p>총·중지·거울은 각각 가위·바위·보의 강화판이에요.</p>
+                <p>
+                  일반 카드 상대로 <b className="text-text-h">이기면 2승</b>,{" "}
+                  <b className="text-text-h">비기면 1승</b>(원래 무승부 → 승리로 전환),{" "}
+                  <b className="text-text-h">지면 상대가 2승</b>을 가져가요.
+                </p>
+                <p>특수카드끼리 맞붙으면 원래 가위바위보 규칙(1승/무승부) 그대로예요.</p>
+                <p>
+                  카드는 낼 때마다 소모돼요(무승부도 예외 없이 소모). 대신 무승부가{" "}
+                  <b className="text-text-h">{DRAWS_TO_RESET}번 쌓이면</b> 양쪽 카드가 전부 초기화돼요.
+                </p>
+              </div>
+            </details>
+          )}
+        </Card>
+
+        <div className="w-full lg:w-96">
+          <ChatBox
+            messages={messages}
+            selfSocketId={socket.id ?? ""}
+            onSend={onSendMessage}
+            messageListClassName="max-h-[520px] min-h-[300px]"
+          />
+        </div>
+      </div>
     </div>
   );
 }
