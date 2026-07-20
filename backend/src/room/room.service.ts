@@ -19,6 +19,15 @@ function getPlayerOrThrow(room: Room, socketId: string): Player {
   return player;
 }
 
+function dedupeNickname(existingNicknames: string[], nickname: string): string {
+  if (!existingNicknames.includes(nickname)) return nickname;
+  let n = 2;
+  while (existingNicknames.includes(`${nickname} (${n})`)) {
+    n++;
+  }
+  return `${nickname} (${n})`;
+}
+
 export function createRoom(nickname: string, socketId: string): Room {
   const roomCode = roomStore.generateRoomCode();
   const player: Player = {
@@ -44,9 +53,13 @@ export function createRoom(nickname: string, socketId: string): Room {
 export function joinRoom(roomCode: string, nickname: string, socketId: string): Room {
   const room = getRoomOrThrow(roomCode);
   if (room.players.length >= MAX_PLAYERS) throw new Error("방이 가득 찼습니다.");
+  const finalNickname = dedupeNickname(
+    room.players.map((p) => p.nickname),
+    nickname,
+  );
   room.players.push({
     socketId,
-    nickname,
+    nickname: finalNickname,
     ready: false,
     selectedHand: null,
     wins: 0,
