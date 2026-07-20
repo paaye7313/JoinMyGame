@@ -8,7 +8,8 @@ type Outcome = "win" | "lose" | "draw";
 
 interface PhaserPlayZoneProps {
   availableCards: { card: CardDef; count: number }[];
-  onSelectHand: (hand: Hand) => void;
+  onHighlight: (hand: Hand) => void;
+  highlightedHand: Hand | null;
   selfCard: CardDef | null;
   selfOutcome?: Outcome;
   opponentCard: CardDef | null;
@@ -58,7 +59,7 @@ function PhaserPlayZone(props: PhaserPlayZoneProps) {
       if (cancelled) return;
       const scene = game.scene.keys["PlayZoneScene"] as PlayZoneScene;
       sceneRef.current = scene;
-      scene.syncState({ ...propsRef.current, onSelect: (hand) => propsRef.current.onSelectHand(hand) });
+      scene.syncState({ ...propsRef.current, onHighlight: (hand) => propsRef.current.onHighlight(hand) });
     });
 
     return () => {
@@ -72,14 +73,23 @@ function PhaserPlayZone(props: PhaserPlayZoneProps) {
   useEffect(() => {
     sceneRef.current?.syncState({
       availableCards: props.availableCards,
-      onSelect: (hand) => propsRef.current.onSelectHand(hand),
+      onHighlight: (hand) => propsRef.current.onHighlight(hand),
+      highlightedHand: props.highlightedHand,
       selfCard: props.selfCard,
       selfOutcome: props.selfOutcome,
       opponentCard: props.opponentCard,
       opponentOutcome: props.opponentOutcome,
       revealed: props.revealed,
     });
-  }, [props.availableCards, props.selfCard, props.selfOutcome, props.opponentCard, props.opponentOutcome, props.revealed]);
+  }, [
+    props.availableCards,
+    props.highlightedHand,
+    props.selfCard,
+    props.selfOutcome,
+    props.opponentCard,
+    props.opponentOutcome,
+    props.revealed,
+  ]);
 
   return (
     <div

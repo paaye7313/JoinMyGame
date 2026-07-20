@@ -37,6 +37,7 @@ function PhaserGamePage({
   const socket = useSocket();
   const [players, setPlayers] = useState<Player[]>(initialPlayers);
   const [selectedHand, setSelectedHand] = useState<Hand | null>(null);
+  const [highlightedHand, setHighlightedHand] = useState<Hand | null>(null);
   const [result, setResult] = useState<GameResult | null>(null);
   const [drawStack, setDrawStack] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
@@ -51,6 +52,7 @@ function PhaserGamePage({
     }
     function handleRematchStarted({ drawStack }: { drawStack: number }) {
       setSelectedHand(null);
+      setHighlightedHand(null);
       setResult(null);
       setDrawStack(drawStack);
     }
@@ -74,6 +76,12 @@ function PhaserGamePage({
   function handleSelectHand(hand: Hand) {
     setSelectedHand(hand);
     socket.emit("selectHand", { roomCode, hand });
+  }
+
+  function handleConfirmSelection() {
+    if (!highlightedHand) return;
+    handleSelectHand(highlightedHand);
+    setHighlightedHand(null);
   }
 
   function handleRematch() {
@@ -132,7 +140,8 @@ function PhaserGamePage({
         <Card className="flex flex-col items-center gap-8 py-10">
           <PhaserPlayZone
             availableCards={availableCards}
-            onSelectHand={handleSelectHand}
+            onHighlight={setHighlightedHand}
+            highlightedHand={highlightedHand}
             selfCard={selfCard}
             selfOutcome={selfOutcome}
             opponentCard={opponentCard}
@@ -143,24 +152,30 @@ function PhaserGamePage({
           {result ? null : selectedHand ? (
             <p className="text-sm text-text">상대방의 선택을 기다리는 중...</p>
           ) : (
-            <details className="w-full rounded-2xl border border-peach-bg bg-peach-bg/40 px-4 py-2 text-text">
-              <summary className="cursor-pointer select-none text-sm font-medium text-text-h">
-                🔫🖕🪞 특수카드가 처음이신가요? 눌러서 규칙 보기
-              </summary>
-              <div className="mt-2 space-y-1 text-xs leading-relaxed text-text">
-                <p>총·중지·거울은 각각 가위·바위·보의 강화판이에요.</p>
-                <p>
-                  일반 카드 상대로 <b className="text-text-h">이기면 2승</b>,{" "}
-                  <b className="text-text-h">비기면 1승</b>(원래 무승부 → 승리로 전환),{" "}
-                  <b className="text-text-h">지면 상대가 2승</b>을 가져가요.
-                </p>
-                <p>특수카드끼리 맞붙으면 원래 가위바위보 규칙(1승/무승부) 그대로예요.</p>
-                <p>
-                  카드는 낼 때마다 소모돼요(무승부도 예외 없이 소모). 대신 무승부가{" "}
-                  <b className="text-text-h">{DRAWS_TO_RESET}번 쌓이면</b> 양쪽 카드가 전부 초기화돼요.
-                </p>
-              </div>
-            </details>
+            <div className="flex w-full flex-col items-center gap-4">
+              <details className="w-full rounded-2xl border border-peach-bg bg-peach-bg/40 px-4 py-2 text-text">
+                <summary className="cursor-pointer select-none text-sm font-medium text-text-h">
+                  🔫🖕🪞 특수카드가 처음이신가요? 눌러서 규칙 보기
+                </summary>
+                <div className="mt-2 space-y-1 text-xs leading-relaxed text-text">
+                  <p>총·중지·거울은 각각 가위·바위·보의 강화판이에요.</p>
+                  <p>
+                    일반 카드 상대로 <b className="text-text-h">이기면 2승</b>,{" "}
+                    <b className="text-text-h">비기면 1승</b>(원래 무승부 → 승리로 전환),{" "}
+                    <b className="text-text-h">지면 상대가 2승</b>을 가져가요.
+                  </p>
+                  <p>특수카드끼리 맞붙으면 원래 가위바위보 규칙(1승/무승부) 그대로예요.</p>
+                  <p>
+                    카드는 낼 때마다 소모돼요(무승부도 예외 없이 소모). 대신 무승부가{" "}
+                    <b className="text-text-h">{DRAWS_TO_RESET}번 쌓이면</b> 양쪽 카드가 전부 초기화돼요.
+                  </p>
+                </div>
+              </details>
+
+              <Button onClick={handleConfirmSelection} disabled={!highlightedHand}>
+                확인
+              </Button>
+            </div>
           )}
         </Card>
 

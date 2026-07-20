@@ -6,7 +6,10 @@ type Outcome = "win" | "lose" | "draw";
 
 export interface PlayZoneSyncState {
   availableCards: { card: CardDef; count: number }[];
-  onSelect: (hand: Hand) => void;
+  // 탭은 확정이 아니라 "하이라이트"만 함 — 실제 확정은 별도 확인 버튼(React)에서 처리.
+  // 스크롤 제스처가 카드 위에서 시작돼도 여기선 하이라이트만 바뀔 뿐 서버로 아무것도 안 나가서 안전함.
+  onHighlight: (hand: Hand) => void;
+  highlightedHand: Hand | null;
   selfCard: CardDef | null;
   selfOutcome?: Outcome;
   opponentCard: CardDef | null;
@@ -26,6 +29,7 @@ const OUTCOME_COLORS: Record<Outcome, number> = {
   draw: 0xf4b183,
 };
 const BACK_PATTERN_BG = 0xe6e1f7;
+const HIGHLIGHT_BORDER = 0x7c6fd6;
 
 // Phaser Text는 폰트 메트릭으로 캔버스 텍스처 크기를 추정하는데, 이모지 등 일부 글리프의
 // 실제 렌더링 높이가 그 추정치보다 커서 위쪽이 잘리는 경우가 있음 — 여유 패딩으로 방지.
@@ -199,8 +203,14 @@ export default class PlayZoneScene extends Phaser.Scene {
 
     cards.forEach(({ card, count }, i) => {
       const x = startX + i * (w + gap);
-      const borderColor = card.category === "special" ? SPECIAL_BORDER : CARD_BORDER;
+      const isHighlighted = card.id === state.highlightedHand;
+      const borderColor = isHighlighted
+        ? HIGHLIGHT_BORDER
+        : card.category === "special"
+          ? SPECIAL_BORDER
+          : CARD_BORDER;
       const box = drawCardBox(this, x, y, w, h, borderColor, false);
+      if (isHighlighted) box.setScale(1.05);
       const icon = this.add
         .text(0, -20, card.icon, { fontSize: "36px", padding: TEXT_PADDING })
         .setOrigin(0.5);
@@ -220,9 +230,9 @@ export default class PlayZoneScene extends Phaser.Scene {
 
       // 클릭 판정용 히트 영역은 Container 안에 넣지 않고 씬 최상위에 독립적으로 둠(위 selectionHitZones 주석 참고).
       const hit = this.add.rectangle(x, y, w, h, 0xffffff, 0).setInteractive({ useHandCursor: true });
-      hit.on("pointerdown", () => state.onSelect(card.id));
+      hit.on("pointerdown", () => state.onHighlight(card.id));
       hit.on("pointerover", () => box.setScale(1.05));
-      hit.on("pointerout", () => box.setScale(1));
+      hit.on("pointerout", () => box.setScale(isHighlighted ? 1.05 : 1));
       this.selectionHitZones.push(hit);
 
       this.selectionRow!.add(box);
