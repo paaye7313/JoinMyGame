@@ -4,6 +4,10 @@ import { GameResult, judgeGame } from "../game";
 import { Hand, SPECIAL_HANDS } from "../game/rps/rps.types";
 import * as roomService from "../room/room.service";
 import { Player, Room } from "../room/room.types";
+import { createRateLimiter } from "../security/rateLimiter";
+
+const connectionLimiter = createRateLimiter(20, 60_000);
+const roomActionLimiter = createRateLimiter(10, 60_000);
 
 interface PlayerView extends Player {
   specialCardCount: number;
@@ -50,16 +54,32 @@ function leaveCurrentRoom(io: Server, socket: Socket): void {
 }
 
 export function registerSocketHandlers(io: Server): void {
+  io.use((socket, next) => {
+    if (!connectionLimiter.check(socket.handshake.address)) {
+      next(new Error("너무 많은 연결 시도입니다. 잠시 후 다시 시도해주세요."));
+      return;
+    }
+    next();
+  });
+
   io.on("connection", (socket: Socket) => {
     console.log(`[socket] connected: ${socket.id}`);
 
     socket.on("createRoom", ({ nickname }: { nickname: string }) => {
+      if (!roomActionLimiter.check(socket.handshake.address)) {
+        socket.emit("error", { message: "너무 많은 요청입니다. 잠시 후 다시 시도해주세요." });
+        return;
+      }
       const room = roomService.createRoom(nickname, socket.id);
       socket.join(room.roomCode);
       socket.emit("roomCreated", { roomCode: room.roomCode, winsToMatch: room.winsToMatch });
     });
 
     socket.on("joinRoom", ({ roomCode, nickname }: { roomCode: string; nickname: string }) => {
+      if (!roomActionLimiter.check(socket.handshake.address)) {
+        socket.emit("error", { message: "너무 많은 요청입니다. 잠시 후 다시 시도해주세요." });
+        return;
+      }
       try {
         const room = roomService.joinRoom(roomCode, nickname, socket.id);
         socket.join(roomCode);

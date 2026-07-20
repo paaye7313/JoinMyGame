@@ -71,6 +71,17 @@ function App() {
   }, [socket, screen]);
 
   useEffect(() => {
+    function handleConnectError(err: Error) {
+      setToast(err.message || "서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.");
+    }
+
+    socket.on("connect_error", handleConnectError);
+    return () => {
+      socket.off("connect_error", handleConnectError);
+    };
+  }, [socket]);
+
+  useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(null), 4000);
     return () => clearTimeout(timer);

@@ -180,6 +180,16 @@ DB/로그인이 없는 MVP 특성상 신고·차단 대신 서버(`backend/src/c
 
 `players`가 실리는 모든 이벤트(`playerJoined`/`playersUpdated`/`playerLeft`/`gameStarted`)는 **수신자별로 다른 payload**를 보냄(`socket/index.ts`의 `broadcastPlayers`/`toWirePlayers`) — 본인 항목은 `cards`가 정확한 값 그대로, 상대방 항목은 기본카드(가위/바위/보)만 정확하고 특수카드(총/중지/거울) 수량은 0으로 가려진 채 대신 `specialCardCount`(상대가 들고 있는 특수카드 총 개수)만 별도로 옴. 상대가 카드를 소모하는 걸 보고 전략을 짤 수 있게 하되, 어떤 특수카드를 들고 있는지는 실제로 낼 때까지 숨기기 위함.
 
+### 연결/요청 제한
+
+`ufw`(포트 필터링)와 `fail2ban`(SSH 브루트포스 차단)만으로는 애플리케이션 레벨(소켓 연결, 방 생성/참가)의 남용을 못 막아서, `backend/src/security/rateLimiter.ts`의 범용 슬라이딩 윈도우 리미터(`createRateLimiter(maxAttempts, windowMs)`)로 두 곳을 제한(`socket/index.ts`):
+
+- **연결 자체**: IP(`socket.handshake.address`)당 분당 20회 — `io.use` 미들웨어에서 검사, 초과 시 핸드셰이크를 거부(`next(new Error(...))`, 클라이언트에는 `connect_error`로 전달되고 `App.tsx`가 토스트로 표시)
+- **`createRoom`/`joinRoom`**: IP당 분당 10회 — 초과 시 핸들러 진입을 막고 기존 `error` 이벤트로 안내
+- 채팅(`chat.service.ts`)은 메시지 내용 검증까지 얽혀있어 이 공용 리미터를 쓰지 않고 별도 구현 유지
+- 현재 Docker 브리지 네트워크(포트 매핑, 리버스 프록시 없음) 구성에서는 컨테이너가 보는 `socket.handshake.address`가 클라이언트의 실제 IP와 같음(DNAT는 목적지만 바꾸고 출발지 IP는 보존). 나중에 nginx 등 리버스 프록시를 앞에 두면 이 주소가 프록시의 IP로 바뀌므로, 그때는 `X-Forwarded-For`를 신뢰하도록 별도 설정이 필요함.
+- 대규모 분산 DoS(DDoS) 자체는 이 리미터로 막을 수 없음(앱 레벨 조치의 한계) — 여기서는 단일 IP의 과도한 반복 요청만 완화.
+
 ---
 
 ## 게임 진행 플로우

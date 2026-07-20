@@ -76,6 +76,13 @@
   - `RoomPage.tsx`: 방 코드 복사 버튼이 이제 6자리 코드가 아니라 전체 초대 URL(`origin + /room/{code}`)을 클립보드에 복사하도록 변경(기존 HTTP 환경 폴백 로직은 그대로 재사용), 안내 문구를 "탭해서 초대 링크 복사"로 수정.
   - Docker 대신 로컬 dev 서버(포트 3100/5273)로 Playwright 검증: (1) 방 생성 시 주소가 `/room/<code>`로 바뀌는지 (2) 복사 버튼이 전체 URL을 복사하는지 (3) 그 URL을 새 브라우저 컨텍스트로 직접 열면 닉네임이 임시값(`손님####`)으로 미리 채워진 확인 화면이 뜨는지 (4) 거기서 입장하면 정상적으로 대기실에 합류하는지 (5) 존재하지 않는 코드로 직접 URL 접속 시 에러 + "메인으로" 버튼으로 탈출되는지 (6) 닉네임을 바꾸고 새로고침해도 localStorage로 유지되는지 — 총 10개 항목 전부 통과. `tsc -b`/`oxlint`/`vite build` 통과.
   - `CLAUDE.md`에 "방 초대 URL / 닉네임" 절 신설, 게임 진행 플로우 다이어그램에 URL 초대 경로 추가.
+- ✅ 접속 남용 방지(연결/방 생성 속도 제한) — "DoS처럼 과하게 접속하면 자동 차단되는지" 질문에서 시작. 확인해보니 `ufw`(포트 필터링)/`fail2ban`(SSH 브루트포스만) 둘 다 애플리케이션 레벨 남용은 못 막고 있었음(같은 IP가 소켓 연결을 무한 반복하거나 `createRoom`을 무한 호출해도 그대로 받아줌). 대규모 분산 DoS(DDoS)는 앱 코드로 막을 영역이 아니라 범위에서 제외하고, 사용자가 확정한 애플리케이션 레벨 두 가지만 적용:
+  - 신규 `backend/src/security/rateLimiter.ts`: "키(IP)당 시간창 내 N회"를 재는 범용 슬라이딩 윈도우 리미터(`createRateLimiter(maxAttempts, windowMs)`). 채팅 쿨다운(`chat.service.ts`)은 메시지 내용 검증까지 얽혀있어 그대로 두고 별도 분리.
+  - `socket/index.ts`: `io.use` 미들웨어로 연결 자체를 IP당 분당 20회로 제한(초과 시 핸드셰이크 거부, 클라이언트엔 `connect_error`), `createRoom`/`joinRoom` 핸들러 진입을 IP당 분당 10회로 제한(초과 시 기존 `error` 이벤트로 안내).
+  - `App.tsx`: `connect_error` 이벤트를 구독해 기존 토스트 UI로 사유를 표시(연결 자체가 거부되는 드문 경우도 조용히 실패하지 않도록).
+  - IP는 `socket.handshake.address` 기준 — 현재 구성(Docker 브리지 네트워크, 리버스 프록시 없음)에서는 DNAT가 목적지만 바꾸고 출발지 IP는 보존해서 정확함. 나중에 nginx 등을 앞에 두면 `X-Forwarded-For` 신뢰 설정이 별도로 필요하다는 점을 `CLAUDE.md`에 메모해둠.
+  - 로컬 dev 서버(포트 3100) + socket.io-client로 직접 Node 스크립트 작성해 검증: (1) 동일 IP로 21번째 연결 시도부터 `connect_error`("너무 많은 연결 시도입니다") 발생 (2) 같은 소켓으로 `createRoom`을 11번째 호출부터 `error`("너무 많은 요청입니다") 발생, 1~10번째는 정상 `roomCreated` — 둘 다 통과. 디버깅 중 테스트 스크립트가 처음엔 통과 못 했는데, 원인은 리미터 로직이 아니라 이전 세션에서 백그라운드로 띄워둔 구버전 백엔드 프로세스가 포트를 물고 있어 코드 변경이 반영 안 된 것이었음(`netstat`/`taskkill`로 정리 후 재검증). `tsc --noEmit`(backend)/`tsc -b`/`oxlint`/`vite build`(frontend) 전부 통과.
+  - `CLAUDE.md`에 "연결/요청 제한" 절 신설.
 
 ## 2. 현재 진행 중인 작업
 
