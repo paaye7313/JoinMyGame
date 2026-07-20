@@ -24,6 +24,12 @@ function PhaserPlayZone(props: PhaserPlayZoneProps) {
   propsRef.current = props;
 
   useEffect(() => {
+    // React StrictMode(dev)는 이 effect를 mount→cleanup→mount로 두 번 실행함. 첫 번째 Phaser.Game이
+    // destroy된 뒤에도 그 READY 콜백이 비동기로 나중에 도착할 수 있는데, 이걸 막지 않으면 sceneRef.current가
+    // 이미 죽은(첫 번째) 씬으로 덮어써져서, 실제 화면에 남아있는(두 번째) 캔버스가 이후 props 동기화를
+    // 전혀 못 받는 경쟁 상태가 생김(카드가 시각적으로는 보이지만 클릭이 하나도 안 먹는 버그로 나타남).
+    let cancelled = false;
+
     const game = new Phaser.Game({
       type: Phaser.AUTO,
       width: SCENE_WIDTH,
@@ -35,15 +41,16 @@ function PhaserPlayZone(props: PhaserPlayZoneProps) {
     gameRef.current = game;
 
     game.events.once(Phaser.Core.Events.READY, () => {
+      if (cancelled) return;
       const scene = game.scene.keys["PlayZoneScene"] as PlayZoneScene;
       sceneRef.current = scene;
       scene.syncState({ ...propsRef.current, onSelect: (hand) => propsRef.current.onSelectHand(hand) });
     });
 
     return () => {
+      cancelled = true;
       game.destroy(true);
-      gameRef.current = null;
-      sceneRef.current = null;
+      if (gameRef.current === game) gameRef.current = null;
     };
     // 마운트/언마운트 시 1회만 Phaser.Game을 생성/파괴 — 이후 props 변화는 아래 별도 useEffect가 scene.syncState로 밀어넣음.
   }, []);

@@ -27,6 +27,10 @@ const OUTCOME_COLORS: Record<Outcome, number> = {
 };
 const BACK_PATTERN_BG = 0xe6e1f7;
 
+// Phaser Text는 폰트 메트릭으로 캔버스 텍스처 크기를 추정하는데, 이모지 등 일부 글리프의
+// 실제 렌더링 높이가 그 추정치보다 커서 위쪽이 잘리는 경우가 있음 — 여유 패딩으로 방지.
+const TEXT_PADDING = { top: 10, bottom: 6 };
+
 const SLOT_CARD_W = 130;
 const SLOT_CARD_H = 190;
 const SELECTION_CARD_W = 100;
@@ -57,7 +61,9 @@ function drawCardBox(
   container.add(bg);
 
   if (faceDown) {
-    const back = scene.add.text(0, 0, "🎴", { fontSize: "40px" }).setOrigin(0.5);
+    const back = scene.add
+      .text(0, 0, "🎴", { fontSize: "40px", padding: TEXT_PADDING })
+      .setOrigin(0.5);
     container.add(back);
   }
 
@@ -70,6 +76,9 @@ export default class PlayZoneScene extends Phaser.Scene {
   private selectionRow?: Phaser.GameObjects.Container;
   private opponentLabel?: Phaser.GameObjects.Text;
   private selfLabel?: Phaser.GameObjects.Text;
+  // 선택 카드의 클릭 영역은 Container 안에 넣지 않고 씬 최상위에 별도로 관리함 —
+  // Container 자식으로 넣으면 히트테스트 좌표가 어긋나 대부분의 클릭이 안 먹는 문제가 있었음.
+  private selectionHitZones: Phaser.GameObjects.Rectangle[] = [];
 
   constructor() {
     super("PlayZoneScene");
@@ -77,14 +86,27 @@ export default class PlayZoneScene extends Phaser.Scene {
 
   create(): void {
     this.add
-      .text(SCENE_WIDTH / 2, VS_Y, "VS", { fontSize: "24px", color: "#7c6fd6", fontStyle: "bold" })
+      .text(SCENE_WIDTH / 2, VS_Y, "VS", {
+        fontSize: "24px",
+        color: "#7c6fd6",
+        fontStyle: "bold",
+        padding: TEXT_PADDING,
+      })
       .setOrigin(0.5);
 
     this.opponentLabel = this.add
-      .text(SCENE_WIDTH / 2, OPPONENT_LABEL_Y, "상대", { fontSize: "16px", color: "#6b6478" })
+      .text(SCENE_WIDTH / 2, OPPONENT_LABEL_Y, "상대", {
+        fontSize: "16px",
+        color: "#6b6478",
+        padding: TEXT_PADDING,
+      })
       .setOrigin(0.5);
     this.selfLabel = this.add
-      .text(SCENE_WIDTH / 2, SELF_LABEL_Y, "나", { fontSize: "16px", color: "#6b6478" })
+      .text(SCENE_WIDTH / 2, SELF_LABEL_Y, "나", {
+        fontSize: "16px",
+        color: "#6b6478",
+        padding: TEXT_PADDING,
+      })
       .setOrigin(0.5);
 
     this.opponentSlot = this.add.container(SCENE_WIDTH / 2, OPPONENT_SLOT_Y);
@@ -120,7 +142,9 @@ export default class PlayZoneScene extends Phaser.Scene {
     if (!card) {
       const box = this.add.rectangle(0, 0, w, h, 0xffffff, 0);
       box.setStrokeStyle(2, CARD_BORDER, 0.6);
-      const q = this.add.text(0, 0, "?", { fontSize: "28px", color: "#c9c2da" }).setOrigin(0.5);
+      const q = this.add
+        .text(0, 0, "?", { fontSize: "28px", color: "#c9c2da", padding: TEXT_PADDING })
+        .setOrigin(0.5);
       slot.add([box, q]);
       return;
     }
@@ -136,9 +160,16 @@ export default class PlayZoneScene extends Phaser.Scene {
     const box = drawCardBox(this, 0, 0, w, h, borderColor, faceDown);
 
     if (!faceDown) {
-      const icon = this.add.text(0, -28, card.icon, { fontSize: "52px" }).setOrigin(0.5);
+      const icon = this.add
+        .text(0, -28, card.icon, { fontSize: "52px", padding: TEXT_PADDING })
+        .setOrigin(0.5);
       const label = this.add
-        .text(0, 46, card.label, { fontSize: "17px", color: "#3a3450", fontStyle: "bold" })
+        .text(0, 46, card.label, {
+          fontSize: "17px",
+          color: "#3a3450",
+          fontStyle: "bold",
+          padding: TEXT_PADDING,
+        })
         .setOrigin(0.5);
       box.add([icon, label]);
     }
@@ -151,6 +182,8 @@ export default class PlayZoneScene extends Phaser.Scene {
   }
 
   private renderSelection(state: PlayZoneSyncState): void {
+    this.selectionHitZones.forEach((zone) => zone.destroy());
+    this.selectionHitZones = [];
     this.selectionRow!.removeAll(true);
     if (state.selfCard) return; // 이미 선택했으면 그리드 숨김
 
@@ -168,23 +201,31 @@ export default class PlayZoneScene extends Phaser.Scene {
       const x = startX + i * (w + gap);
       const borderColor = card.category === "special" ? SPECIAL_BORDER : CARD_BORDER;
       const box = drawCardBox(this, x, y, w, h, borderColor, false);
-      const icon = this.add.text(0, -20, card.icon, { fontSize: "36px" }).setOrigin(0.5);
-      const label = this.add
-        .text(0, 34, card.label, { fontSize: "15px", color: "#3a3450" })
+      const icon = this.add
+        .text(0, -20, card.icon, { fontSize: "36px", padding: TEXT_PADDING })
         .setOrigin(0.5);
-      box.add([icon, label]);
+      const label = this.add
+        .text(0, 34, card.label, { fontSize: "15px", color: "#3a3450", padding: TEXT_PADDING })
+        .setOrigin(0.5);
 
       const badge = this.add.circle(w / 2 - 10, -h / 2 + 10, 14, 0x7c6fd6);
       const badgeText = this.add
-        .text(w / 2 - 10, -h / 2 + 10, String(count), { fontSize: "13px", color: "#ffffff" })
+        .text(w / 2 - 10, -h / 2 + 10, String(count), {
+          fontSize: "13px",
+          color: "#ffffff",
+          padding: TEXT_PADDING,
+        })
         .setOrigin(0.5);
+      box.add([icon, label, badge, badgeText]);
 
+      // 클릭 판정용 히트 영역은 Container 안에 넣지 않고 씬 최상위에 독립적으로 둠(위 selectionHitZones 주석 참고).
       const hit = this.add.rectangle(x, y, w, h, 0xffffff, 0).setInteractive({ useHandCursor: true });
       hit.on("pointerdown", () => state.onSelect(card.id));
       hit.on("pointerover", () => box.setScale(1.05));
       hit.on("pointerout", () => box.setScale(1));
+      this.selectionHitZones.push(hit);
 
-      this.selectionRow!.add([box, badge, badgeText, hit]);
+      this.selectionRow!.add(box);
     });
   }
 

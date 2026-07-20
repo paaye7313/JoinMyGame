@@ -124,29 +124,6 @@ function PhaserGamePage({
         <p className="text-sm text-text">
           방 코드: <code>{roomCode}</code> · {formatMatchLabel(winsToMatch)}
         </p>
-        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary-bg px-4 py-1.5 text-sm font-semibold text-primary">
-          <span>나 {self?.wins ?? 0}</span>
-          <span className="text-text">:</span>
-          <span>{opponent?.wins ?? 0} 상대</span>
-        </div>
-        <div className="mt-2 flex items-center justify-center gap-3 text-xs text-text">
-          <span className="font-medium text-text-h">
-            {opponent ? nicknameOf(opponent.socketId) : "상대"} 카드
-          </span>
-          <span>✌️{opponent?.cards.scissors ?? 0}</span>
-          <span>✊{opponent?.cards.rock ?? 0}</span>
-          <span>✋{opponent?.cards.paper ?? 0}</span>
-          <span>🎴×{opponent?.specialCardCount ?? 0}</span>
-        </div>
-        <div className="mt-2 flex items-center justify-center gap-1.5 text-xs text-text">
-          <span>무승부 스택</span>
-          {Array.from({ length: DRAWS_TO_RESET }).map((_, i) => (
-            <span
-              key={i}
-              className={`h-2.5 w-2.5 rounded-full ${i < drawStack ? "bg-peach" : "bg-border"}`}
-            />
-          ))}
-        </div>
       </div>
 
       {errorMessage && <p className="text-sm text-danger">{errorMessage}</p>}
@@ -163,54 +140,7 @@ function PhaserGamePage({
             revealed={!!result}
           />
 
-          {result ? (
-            <div className="flex flex-col items-center gap-4">
-              <p className="text-lg font-semibold text-text-h">
-                {result.matchOver
-                  ? result.winner === socket.id
-                    ? "게임 승리!"
-                    : "게임 패배..."
-                  : result.winner === "draw"
-                    ? "무승부!"
-                    : result.winner === socket.id
-                      ? "라운드 승리!"
-                      : "라운드 패배..."}
-                {result.winner !== "draw" && result.winsDelta === 2 && (
-                  <span className="ml-2 text-sm font-medium text-peach">특수카드! 2승 획득</span>
-                )}
-              </p>
-
-              {result.cardsReset && (
-                <p className="rounded-full bg-peach-bg px-4 py-1.5 text-sm font-medium text-peach">
-                  무승부 {DRAWS_TO_RESET}회 누적! 양쪽 카드가 모두 초기화되었어요
-                </p>
-              )}
-
-              <div className="flex justify-center gap-8">
-                {players.map((p) => (
-                  <PlayerAvatar
-                    key={p.socketId}
-                    nickname={p.nickname}
-                    isSelf={p.socketId === socket.id}
-                    status={
-                      <Badge tone={p.ready ? "secondary" : "neutral"}>
-                        {p.ready ? `${continueLabel} 동의` : "대기 중"}
-                      </Badge>
-                    }
-                  />
-                ))}
-              </div>
-
-              <div className="flex gap-3">
-                <Button onClick={handleRematch} disabled={self?.ready}>
-                  {continueLabel}
-                </Button>
-                <Button variant="secondary" onClick={handleLeave}>
-                  나가기
-                </Button>
-              </div>
-            </div>
-          ) : selectedHand ? (
+          {result ? null : selectedHand ? (
             <p className="text-sm text-text">상대방의 선택을 기다리는 중...</p>
           ) : (
             <details className="w-full rounded-2xl border border-peach-bg bg-peach-bg/40 px-4 py-2 text-text">
@@ -234,12 +164,91 @@ function PhaserGamePage({
           )}
         </Card>
 
-        <div className="w-full lg:w-96">
+        <div className="flex w-full flex-col gap-4 lg:w-96">
+          <div className="flex flex-col gap-3 rounded-2xl border border-border bg-panel p-4 shadow-panel">
+            <div className="flex justify-center gap-8">
+              {players.map((p) => (
+                <PlayerAvatar
+                  key={p.socketId}
+                  nickname={p.nickname}
+                  isSelf={p.socketId === socket.id}
+                  status={
+                    result ? (
+                      <Badge tone={p.ready ? "secondary" : "neutral"}>
+                        {p.ready ? `${continueLabel} 동의` : "대기 중"}
+                      </Badge>
+                    ) : undefined
+                  }
+                />
+              ))}
+            </div>
+
+            <div className="flex items-center justify-center gap-2 rounded-full bg-primary-bg px-4 py-1.5 text-sm font-semibold text-primary">
+              <span>나 {self?.wins ?? 0}</span>
+              <span className="text-text">:</span>
+              <span>{opponent?.wins ?? 0} 상대</span>
+            </div>
+
+            <div className="flex items-center justify-center gap-3 text-xs text-text">
+              <span className="font-medium text-text-h">
+                {opponent ? nicknameOf(opponent.socketId) : "상대"} 카드
+              </span>
+              <span>✌️{opponent?.cards.scissors ?? 0}</span>
+              <span>✊{opponent?.cards.rock ?? 0}</span>
+              <span>✋{opponent?.cards.paper ?? 0}</span>
+              <span>🎴×{opponent?.specialCardCount ?? 0}</span>
+            </div>
+
+            <div className="flex items-center justify-center gap-1.5 text-xs text-text">
+              <span>무승부 스택</span>
+              {Array.from({ length: DRAWS_TO_RESET }).map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-2.5 w-2.5 rounded-full ${i < drawStack ? "bg-peach" : "bg-border"}`}
+                />
+              ))}
+            </div>
+
+            {result && (
+              <>
+                <p className="text-center text-lg font-semibold text-text-h">
+                  {result.matchOver
+                    ? result.winner === socket.id
+                      ? "게임 승리!"
+                      : "게임 패배..."
+                    : result.winner === "draw"
+                      ? "무승부!"
+                      : result.winner === socket.id
+                        ? "라운드 승리!"
+                        : "라운드 패배..."}
+                  {result.winner !== "draw" && result.winsDelta === 2 && (
+                    <span className="ml-2 text-sm font-medium text-peach">특수카드! 2승 획득</span>
+                  )}
+                </p>
+
+                {result.cardsReset && (
+                  <p className="rounded-full bg-peach-bg px-4 py-1.5 text-center text-sm font-medium text-peach">
+                    무승부 {DRAWS_TO_RESET}회 누적! 양쪽 카드가 모두 초기화되었어요
+                  </p>
+                )}
+
+                <div className="flex justify-center gap-3">
+                  <Button onClick={handleRematch} disabled={self?.ready}>
+                    {continueLabel}
+                  </Button>
+                  <Button variant="secondary" onClick={handleLeave}>
+                    나가기
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+
           <ChatBox
             messages={messages}
             selfSocketId={socket.id ?? ""}
             onSend={onSendMessage}
-            messageListClassName="max-h-[520px] min-h-[300px]"
+            messageListClassName="max-h-[360px] min-h-[200px]"
           />
         </div>
       </div>
