@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { ChatMessage } from "../../types";
 
 const MAX_MESSAGE_LENGTH = 200;
@@ -11,6 +11,12 @@ interface ChatBoxProps {
 
 function ChatBox({ messages, selfSocketId, onSend }: ChatBoxProps) {
   const [draft, setDraft] = useState("");
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -22,7 +28,7 @@ function ChatBox({ messages, selfSocketId, onSend }: ChatBoxProps) {
 
   return (
     <div className="flex w-full flex-col gap-2 rounded-2xl border border-border bg-panel p-4 shadow-panel">
-      <div className="flex max-h-40 flex-col gap-1.5 overflow-y-auto">
+      <div ref={listRef} className="flex max-h-40 flex-col gap-1.5 overflow-y-auto">
         {messages.length === 0 && <p className="text-xs text-text">아직 채팅이 없어요.</p>}
         {messages.map((m) => {
           const isSelf = m.socketId === selfSocketId;
