@@ -1,4 +1,5 @@
 import { Server, Socket } from "socket.io";
+import * as chatService from "../chat/chat.service";
 import { GameResult, judgeGame } from "../game";
 import { Hand, SPECIAL_HANDS } from "../game/rps/rps.types";
 import * as roomService from "../room/room.service";
@@ -39,6 +40,7 @@ function broadcastPlayers(
 }
 
 function leaveCurrentRoom(io: Server, socket: Socket): void {
+  chatService.clearChatState(socket.id);
   const room = roomService.removePlayer(socket.id);
   if (!room) return;
   socket.leave(room.roomCode);
@@ -125,6 +127,21 @@ export function registerSocketHandlers(io: Server): void {
         if (room.gameState === "PLAYING") {
           io.to(roomCode).emit("rematchStarted", { drawStack: room.drawStack });
         }
+      } catch (err) {
+        socket.emit("error", { message: (err as Error).message });
+      }
+    });
+
+    socket.on("chatMessage", ({ roomCode, message }: { roomCode: string; message: string }) => {
+      try {
+        const player = roomService.findPlayerInRoom(roomCode, socket.id);
+        const clean = chatService.validateAndRecordMessage(socket.id, message);
+        io.to(roomCode).emit("chatMessage", {
+          socketId: socket.id,
+          nickname: player.nickname,
+          message: clean,
+          timestamp: Date.now(),
+        });
       } catch (err) {
         socket.emit("error", { message: (err as Error).message });
       }

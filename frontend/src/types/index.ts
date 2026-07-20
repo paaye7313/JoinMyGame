@@ -16,6 +16,13 @@ export interface Player {
   specialCardCount: number;
 }
 
+export interface ChatMessage {
+  socketId: string;
+  nickname: string;
+  message: string;
+  timestamp: number;
+}
+
 export interface GameResult {
   winner: string | "draw";
   hands: Record<string, Hand>;

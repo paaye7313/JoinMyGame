@@ -17,6 +17,7 @@ app.get("/health", (_req, res) => {
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: CLIENT_ORIGIN },
+  maxHttpBufferSize: 1_000_000,
 });
 
 registerSocketHandlers(io);

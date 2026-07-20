@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useSocket } from "../hooks/useSocket";
-import type { GameResult, Hand, Player } from "../types";
+import type { ChatMessage, GameResult, Hand, Player } from "../types";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
 import PlayerAvatar from "../components/ui/PlayerAvatar";
+import ChatBox from "../components/Chat/ChatBox";
 import { HAND_CARDS, getCardDef, type CardDef } from "../game/rps/cards";
 import HandCard from "../game/rps/components/HandCard";
 import PlayZone from "../game/rps/components/PlayZone";
@@ -13,6 +14,8 @@ interface GamePageProps {
   roomCode: string;
   players: Player[];
   winsToMatch: number;
+  messages: ChatMessage[];
+  onSendMessage: (message: string) => void;
   onExit: () => void;
 }
 
@@ -24,7 +27,14 @@ function formatMatchLabel(winsToMatch: number): string {
   return `${winsToMatch * 2 - 1}판 ${winsToMatch}선승`;
 }
 
-function GamePage({ roomCode, players: initialPlayers, winsToMatch, onExit }: GamePageProps) {
+function GamePage({
+  roomCode,
+  players: initialPlayers,
+  winsToMatch,
+  messages,
+  onSendMessage,
+  onExit,
+}: GamePageProps) {
   const socket = useSocket();
   const [players, setPlayers] = useState<Player[]>(initialPlayers);
   const [selectedHand, setSelectedHand] = useState<Hand | null>(null);
@@ -236,6 +246,8 @@ function GamePage({ roomCode, players: initialPlayers, winsToMatch, onExit }: Ga
       </Card>
 
       {errorMessage && <p className="text-sm text-danger">{errorMessage}</p>}
+
+      <ChatBox messages={messages} selfSocketId={socket.id ?? ""} onSend={onSendMessage} />
     </div>
   );
 }

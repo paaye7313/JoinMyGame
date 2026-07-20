@@ -3,7 +3,7 @@ import { useSocket } from "./hooks/useSocket";
 import GamePage from "./pages/GamePage";
 import MainPage from "./pages/MainPage";
 import RoomPage from "./pages/RoomPage";
-import type { Player } from "./types";
+import type { ChatMessage, Player } from "./types";
 
 type Screen =
   | { name: "main" }
@@ -14,6 +14,27 @@ function App() {
   const socket = useSocket();
   const [screen, setScreen] = useState<Screen>({ name: "main" });
   const [toast, setToast] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  useEffect(() => {
+    function handleChatMessage(message: ChatMessage) {
+      setMessages((prev) => [...prev, message]);
+    }
+
+    socket.on("chatMessage", handleChatMessage);
+    return () => {
+      socket.off("chatMessage", handleChatMessage);
+    };
+  }, [socket]);
+
+  function handleExit() {
+    setMessages([]);
+    setScreen({ name: "main" });
+  }
+
+  function handleSendMessage(roomCode: string, message: string) {
+    socket.emit("chatMessage", { roomCode, message });
+  }
 
   useEffect(() => {
     function handlePlayerLeft({ players }: { players: Player[] }) {
@@ -56,10 +77,12 @@ function App() {
           roomCode={screen.roomCode}
           initialPlayers={screen.players}
           initialWinsToMatch={screen.winsToMatch}
+          messages={messages}
+          onSendMessage={(message) => handleSendMessage(screen.roomCode, message)}
           onGameStart={(players, winsToMatch) =>
             setScreen({ name: "game", roomCode: screen.roomCode, players, winsToMatch })
           }
-          onExit={() => setScreen({ name: "main" })}
+          onExit={handleExit}
         />
       )}
       {screen.name === "game" && (
@@ -67,7 +90,9 @@ function App() {
           roomCode={screen.roomCode}
           players={screen.players}
           winsToMatch={screen.winsToMatch}
-          onExit={() => setScreen({ name: "main" })}
+          messages={messages}
+          onSendMessage={(message) => handleSendMessage(screen.roomCode, message)}
+          onExit={handleExit}
         />
       )}
     </>

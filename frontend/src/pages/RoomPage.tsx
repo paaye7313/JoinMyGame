@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react";
 import { useSocket } from "../hooks/useSocket";
-import type { Player } from "../types";
+import type { ChatMessage, Player } from "../types";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
 import PlayerAvatar from "../components/ui/PlayerAvatar";
+import ChatBox from "../components/Chat/ChatBox";
 
 interface RoomPageProps {
   roomCode: string;
   initialPlayers: Player[];
   initialWinsToMatch: number;
+  messages: ChatMessage[];
+  onSendMessage: (message: string) => void;
   onGameStart: (players: Player[], winsToMatch: number) => void;
   onExit: () => void;
 }
@@ -19,7 +22,15 @@ const MATCH_FORMATS = [
   { winsToMatch: 3, label: "5판 3선승" },
 ];
 
-function RoomPage({ roomCode, initialPlayers, initialWinsToMatch, onGameStart, onExit }: RoomPageProps) {
+function RoomPage({
+  roomCode,
+  initialPlayers,
+  initialWinsToMatch,
+  messages,
+  onSendMessage,
+  onGameStart,
+  onExit,
+}: RoomPageProps) {
   const socket = useSocket();
   const [players, setPlayers] = useState<Player[]>(initialPlayers);
   const [winsToMatch, setWinsToMatch] = useState(initialWinsToMatch);
@@ -160,6 +171,8 @@ function RoomPage({ roomCode, initialPlayers, initialWinsToMatch, onGameStart, o
       </Card>
 
       {errorMessage && <p className="text-sm text-danger">{errorMessage}</p>}
+
+      <ChatBox messages={messages} selfSocketId={socket.id ?? ""} onSend={onSendMessage} />
     </div>
   );
 }

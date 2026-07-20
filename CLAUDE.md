@@ -151,6 +151,7 @@ type Hand = "scissors" | "rock" | "paper";
 | `rematch` | `{ roomCode }` | 재경기 요청 |
 | `leaveRoom` | — | 방 나가기 요청 (자발적으로 나가는 경우; 연결 종료 시엔 `disconnect`가 동일 로직을 처리) |
 | `setMatchFormat` | `{ roomCode, winsToMatch }` | 경기 방식 변경 요청 (2 또는 3만 허용, 대기실에서만 의미 있음) |
+| `chatMessage` | `{ roomCode, message }` | 채팅 메시지 전송 (대기실/게임 화면 공통) |
 
 ### Server → Client
 
@@ -164,7 +165,18 @@ type Hand = "scissors" | "rock" | "paper";
 | `gameStarted` | `{ players, winsToMatch, drawStack }` | 두 플레이어 모두 Ready, 게임 시작. payload를 실어 보내는 이유: 클라이언트가 자신의 로컬 상태(클로저)에 의존하면 다른 이벤트와 연달아 도착할 때 리액트 상태 반영 전 값을 읽는 경쟁 상태가 생길 수 있어, 항상 이 payload를 신뢰해야 함 |
 | `result` | `{ winner, hands, winsDelta, scores, matchOver, cardsReset, drawStack }` | 라운드 결과. `scores`는 `{ socketId: 승수 }`, `matchOver`는 이 라운드로 매치가 끝났는지, `cardsReset`은 이 라운드로 무승부 누적이 `DRAWS_TO_RESET`에 도달해 양쪽 카드가 초기화됐는지, `drawStack`은 갱신된 누적 무승부 횟수 |
 | `rematchStarted` | `{ drawStack }` | 재경기(또는 다음 라운드) 시작. 새 매치가 시작된 경우 `drawStack`은 0 |
+| `chatMessage` | `{ socketId, nickname, message, timestamp }` | 채팅 메시지 브로드캐스트 (같은 방 전체, 카드처럼 수신자별로 가릴 필요가 없어 단순 `io.to(roomCode).emit`) |
 | `error` | `{ message }` | 에러 전달 |
+
+### 채팅 제한 규칙
+
+DB/로그인이 없는 MVP 특성상 신고·차단 대신 서버(`backend/src/chat/chat.service.ts`)에서 다음을 검증하고, 위반 시 기존 `error` 이벤트로 알림:
+
+- 메시지 길이 200자 초과 금지, 빈 메시지 금지, 제어문자(널바이트 등) 포함 금지
+- 소켓당 최소 전송 간격 500ms(너무 빠른 연속 전송 차단)
+- 동일한 메시지를 연속 3회째 보내려 하면 차단(도배 방지)
+- 욕설 필터링은 하지 않음(사용자 확정 — 특수카드에 이미 중지🖕가 있어 의미 없다고 판단)
+- Socket.IO 서버(`backend/src/server.ts`)에 `maxHttpBufferSize: 1_000_000`(1MB) 명시로 비정상적으로 큰 페이로드를 전송 계층에서 차단
 
 `players`가 실리는 모든 이벤트(`playerJoined`/`playersUpdated`/`playerLeft`/`gameStarted`)는 **수신자별로 다른 payload**를 보냄(`socket/index.ts`의 `broadcastPlayers`/`toWirePlayers`) — 본인 항목은 `cards`가 정확한 값 그대로, 상대방 항목은 기본카드(가위/바위/보)만 정확하고 특수카드(총/중지/거울) 수량은 0으로 가려진 채 대신 `specialCardCount`(상대가 들고 있는 특수카드 총 개수)만 별도로 옴. 상대가 카드를 소모하는 걸 보고 전략을 짤 수 있게 하되, 어떤 특수카드를 들고 있는지는 실제로 낼 때까지 숨기기 위함.
 

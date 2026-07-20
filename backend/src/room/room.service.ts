@@ -177,6 +177,11 @@ export function removePlayer(socketId: string): Room | undefined {
   return undefined;
 }
 
+export function findPlayerInRoom(roomCode: string, socketId: string): Player {
+  const room = getRoomOrThrow(roomCode);
+  return getPlayerOrThrow(room, socketId);
+}
+
 export function allReady(room: Room): boolean {
   return room.players.length === MAX_PLAYERS && room.players.every((p) => p.ready);
 }
