@@ -111,6 +111,12 @@
   - `PhaserPlayZone.tsx`: `onSelectHand` prop을 `onHighlight`로 교체, `highlightedHand`를 그대로 씬에 전달.
   - `PhaserGamePage.tsx`: 새 state `highlightedHand`(하이라이트만, 서버로 아직 안 나감) 추가, 기존 `handleSelectHand`(실제 확정 + 서버 emit)는 그대로 두되 새 "확인" 버튼(React `Button`, 하이라이트 없으면 비활성)에서만 호출하도록 변경. `rematchStarted` 시 하이라이트도 초기화.
   - Playwright로 모바일 뷰포트에서 (1) 확인 버튼이 하이라이트 전엔 비활성인지 (2) 카드를 탭해도 아직 서버로 안 나가고(대기 문구 없음) 확인 버튼만 활성화되는지 (3) 확인을 눌러야 실제로 확정되어 상대 대기 문구가 뜨는지 (4) 양쪽 다 확인 후 결과가 정상 수신되는지 전부 통과. `tsc -b`/`oxlint`/`vite build` 통과.
+- ✅ `/phaser-test` 품질 테스트 결과를 정식 채택 — 사용자가 "phaser로 만든 것을 기본으로 하자"로 확정, `GamePage`를 Phaser 버전으로 교체.
+  - `frontend/src/pages/GamePage.tsx`: 기존 내용을 `PhaserGamePage.tsx` 내용으로 통째로 교체(타이틀에서 "(Phaser 테스트)" 문구만 제거), `PhaserGamePage.tsx`는 삭제.
+  - 이제 쓰이지 않게 된 구버전 비-Phaser 카드 컴포넌트 `frontend/src/game/rps/components/PlayZone.tsx`, `HandCard.tsx` 삭제(다른 곳에서 참조 없음 확인 후 삭제).
+  - `App.tsx`: `usePhaserRenderer`/`isPhaserRequested`/`withPhaserFlag` 엔진 분기 로직 전부 제거(더 이상 두 버전을 병행하지 않으므로), `pushState` 경로도 쿼리 없는 순수 경로로 단순화. `screen.name === "game"`일 때 무조건 `GamePage`(Phaser 버전) 렌더링.
+  - `CLAUDE.md`: 기술 스택에 Phaser 추가, 프로젝트 구조에 `game/rps/phaser`·`components/PhaserPlayZone.tsx` 경로 추가, "Phaser 엔진 도입 검토(실험적)" 절을 "Phaser 엔진(정식 채택)"으로 갱신.
+  - `tsc -b`/`oxlint`/`vite build` 전부 통과(번들 크기 500KB 초과 경고는 기존에 알려진 트레이드오프로 유지).
 
 ## 2. 현재 진행 중인 작업
 
@@ -119,7 +125,6 @@
 ## 3. 앞으로 해야 할 작업
 
 - ⬜ (필요 시) MVP 이후 확장: 묵찌빠, 오목, 카드게임 등 `game/` 하위 신규 게임 추가
-- ⬜ `/phaser-test` 품질 테스트 결과에 따라: 마음에 들면 `GamePage`를 Phaser 버전으로 교체하거나, 마음에 안 들면 관련 파일 삭제 — 아직 사용자 판단 전.
 
 ## 4. 현재 이슈나 메모
 

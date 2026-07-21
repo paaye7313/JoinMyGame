@@ -17,7 +17,7 @@
 
 | 영역 | 기술 |
 |---|---|
-| Frontend | React, Vite, TypeScript |
+| Frontend | React, Vite, TypeScript, Phaser (게임 화면 렌더링) |
 | Backend | Node.js, Express, Socket.IO, TypeScript |
 | 개발 환경 | Docker, Docker Compose |
 | 패키지 관리 | npm |
@@ -41,7 +41,10 @@ JoinMyGame/
 │       ├── pages/
 │       │   ├── MainPage.tsx   ← 방 만들기 / 방 참가 선택
 │       │   ├── RoomPage.tsx   ← 대기실, Ready 버튼
-│       │   └── GamePage.tsx   ← 게임 진행, 결과, 재경기
+│       │   └── GamePage.tsx   ← 게임 진행, 결과, 재경기 (카드 대결 화면은 Phaser로 렌더링)
+│       ├── game/rps/
+│       │   ├── phaser/PlayZoneScene.ts        ← Phaser Scene, 카드 그리기/선택/뒤집기 연출
+│       │   └── components/PhaserPlayZone.tsx  ← React ↔ Phaser 브릿지 (마운트 시 Game 생성, props 변경 시 syncState)
 │       ├── components/
 │       │   ├── Room/
 │       │   └── Game/
@@ -286,6 +289,8 @@ DB/로그인이 없는 MVP 특성상 신고·차단 대신 서버(`backend/src/c
 
 Room 관리, Socket 통신, 플레이어 관리 코드는 모든 게임에서 공유합니다.
 
-### Phaser 엔진 도입 검토 (실험적, `/phaser-test`)
+### Phaser 엔진 (정식 채택, `GamePage`의 기본 렌더러)
 
-캐릭터가 움직이는 2D 액션/아케이드 게임을 다음 확장으로 구상 중이라, Phaser 3 계열 엔진(현재 설치된 건 API 호환되는 Phaser 4)을 미리 검증해보기 위해 가위바위보를 Phaser로 이식한 **품질 테스트 전용 페이지**를 `/phaser-test` 경로에 병렬로 만들어둠(`frontend/src/pages/PhaserGamePage.tsx`, `frontend/src/game/rps/phaser/PlayZoneScene.ts`, `frontend/src/game/rps/components/PhaserPlayZone.tsx`). 정식 기능이 아니라 `MainPage`에는 노출되지 않고, 기존 `GamePage`/`RoomPage`/`MainPage`는 전혀 수정하지 않았음 — 판단이 서면 `GamePage`를 이 방식으로 교체하거나, 마음에 안 들면 이 파일들만 삭제하면 됨. React(상태/이벤트) ↔ Phaser(자체 캔버스/게임 루프) 브릿지 패턴은 `PhaserPlayZone.tsx` 참고.
+캐릭터가 움직이는 2D 액션/아케이드 게임을 다음 확장으로 구상 중이라, `/phaser-test` 경로에서 가위바위보를 Phaser로 이식해 품질 검증을 거친 뒤(`PROGRESS.md` 기록 참고), 그 결과를 정식 `GamePage`로 승격함. 카드 대결 화면은 `frontend/src/game/rps/phaser/PlayZoneScene.ts`(Phaser Scene, 카드 그리기/선택/뒤집기 연출)와 `frontend/src/game/rps/components/PhaserPlayZone.tsx`(React ↔ Phaser 브릿지 — 마운트 시 1회 `Phaser.Game` 생성, 이후 props 변경마다 `scene.syncState(...)` 호출)로 렌더링됨. 실험 단계에서 쓰던 `/phaser-test` 전용 페이지(`PhaserGamePage.tsx`)와 구버전 비-Phaser 카드 컴포넌트(`PlayZone.tsx`, `HandCard.tsx`)는 삭제했고, `App.tsx`의 엔진 분기(`?engine=phaser` 쿼리)도 제거함 — 이제 `GamePage`가 곧 Phaser 버전이라 분기가 필요 없음.
+
+현재 설치된 패키지명은 `phaser`(4.x, API는 기존에 알려진 Phaser 3와 거의 동일 — `Scene`/`GameObjectFactory`/`Tweens` 등 마이그레이션 이슈 없음, 다만 `SceneManager`에 `getScene()` 같은 헬퍼는 없어서 `game.scene.keys["씬이름"]`으로 인스턴스를 직접 가져와야 함). Phaser가 새 의존성이라 번들 크기 경고(500KB 초과)가 발생하는데, 알려진 트레이드오프로 별도 code-splitting은 하지 않음.
