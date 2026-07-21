@@ -6,10 +6,13 @@ import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
 import PlayerAvatar from "../components/ui/PlayerAvatar";
 import ChatBox from "../components/Chat/ChatBox";
+import { GAME_OPTIONS } from "../game/registry";
 
 interface RoomPageProps {
   roomCode: string;
   initialPlayers: Player[];
+  gameType: string;
+  maxPlayers: number;
   initialWinsToMatch: number;
   messages: ChatMessage[];
   onSendMessage: (message: string) => void;
@@ -25,6 +28,8 @@ const MATCH_FORMATS = [
 function RoomPage({
   roomCode,
   initialPlayers,
+  gameType,
+  maxPlayers,
   initialWinsToMatch,
   messages,
   onSendMessage,
@@ -75,6 +80,8 @@ function RoomPage({
   }, [socket, onGameStart]);
 
   const self = players.find((p) => p.socketId === socket.id);
+  const hasAI = players.some((p) => p.isAI);
+  const supportsAI = GAME_OPTIONS.find((o) => o.id === gameType)?.supportsAI ?? false;
 
   function handleReady() {
     socket.emit("ready", { roomCode });
@@ -82,6 +89,14 @@ function RoomPage({
 
   function handleSelectFormat(format: number) {
     socket.emit("setMatchFormat", { roomCode, winsToMatch: format });
+  }
+
+  function handleAddAi() {
+    socket.emit("addAiPlayer", { roomCode });
+  }
+
+  function handleRemoveAi() {
+    socket.emit("removeAiPlayer", { roomCode });
   }
 
   function handleLeave() {
@@ -112,32 +127,36 @@ function RoomPage({
     <div className="flex w-full max-w-md flex-1 flex-col items-center gap-6 px-6 py-10">
       <h1 className="text-2xl font-semibold text-text-h">대기실</h1>
 
-      <Card className="flex w-full flex-col items-center gap-1 bg-primary-bg py-6">
-        <span className="text-sm text-text">방 코드</span>
-        <button
-          type="button"
-          onClick={handleCopyCode}
-          className="text-4xl font-bold tracking-[0.3em] text-primary"
-        >
-          {roomCode}
-        </button>
-        <span className="text-xs text-text">{copied ? "링크 복사됨!" : "탭해서 초대 링크 복사"}</span>
-      </Card>
+      {!hasAI && (
+        <Card className="flex w-full flex-col items-center gap-1 bg-primary-bg py-6">
+          <span className="text-sm text-text">방 코드</span>
+          <button
+            type="button"
+            onClick={handleCopyCode}
+            className="text-4xl font-bold tracking-[0.3em] text-primary"
+          >
+            {roomCode}
+          </button>
+          <span className="text-xs text-text">{copied ? "링크 복사됨!" : "탭해서 초대 링크 복사"}</span>
+        </Card>
+      )}
 
-      <Card className="flex w-full flex-col items-center gap-4">
-        <span className="text-sm text-text">경기 방식</span>
-        <div className="flex gap-3">
-          {MATCH_FORMATS.map((format) => (
-            <Button
-              key={format.winsToMatch}
-              variant={winsToMatch === format.winsToMatch ? "primary" : "secondary"}
-              onClick={() => handleSelectFormat(format.winsToMatch)}
-            >
-              {format.label}
-            </Button>
-          ))}
-        </div>
-      </Card>
+      {gameType === "rps" && (
+        <Card className="flex w-full flex-col items-center gap-4">
+          <span className="text-sm text-text">경기 방식</span>
+          <div className="flex gap-3">
+            {MATCH_FORMATS.map((format) => (
+              <Button
+                key={format.winsToMatch}
+                variant={winsToMatch === format.winsToMatch ? "primary" : "secondary"}
+                onClick={() => handleSelectFormat(format.winsToMatch)}
+              >
+                {format.label}
+              </Button>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card className="flex w-full flex-col items-center gap-6">
         <div className="flex justify-center gap-10">
@@ -155,7 +174,24 @@ function RoomPage({
           ))}
         </div>
 
-        {players.length < 2 && <p className="text-sm text-text">상대방을 기다리는 중...</p>}
+        {players.length < maxPlayers && (
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-sm text-text">
+              다른 플레이어를 기다리는 중... ({players.length}/{maxPlayers})
+            </p>
+            {supportsAI && (
+              <Button variant="secondary" onClick={handleAddAi}>
+                AI로 채우기
+              </Button>
+            )}
+          </div>
+        )}
+
+        {hasAI && (
+          <Button variant="secondary" onClick={handleRemoveAi}>
+            AI 제거
+          </Button>
+        )}
 
         <div className="flex gap-3">
           <Button onClick={handleReady} disabled={self?.ready}>
@@ -166,8 +202,8 @@ function RoomPage({
           </Button>
         </div>
 
-        {self?.ready && players.length === 2 && (
-          <p className="text-sm text-text">상대방의 Ready를 기다리는 중...</p>
+        {self?.ready && players.length === maxPlayers && (
+          <p className="text-sm text-text">다른 플레이어의 Ready를 기다리는 중...</p>
         )}
       </Card>
 

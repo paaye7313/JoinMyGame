@@ -117,6 +117,32 @@
   - `App.tsx`: `usePhaserRenderer`/`isPhaserRequested`/`withPhaserFlag` 엔진 분기 로직 전부 제거(더 이상 두 버전을 병행하지 않으므로), `pushState` 경로도 쿼리 없는 순수 경로로 단순화. `screen.name === "game"`일 때 무조건 `GamePage`(Phaser 버전) 렌더링.
   - `CLAUDE.md`: 기술 스택에 Phaser 추가, 프로젝트 구조에 `game/rps/phaser`·`components/PhaserPlayZone.tsx` 경로 추가, "Phaser 엔진 도입 검토(실험적)" 절을 "Phaser 엔진(정식 채택)"으로 갱신.
   - `tsc -b`/`oxlint`/`vite build` 전부 통과(번들 크기 500KB 초과 경고는 기존에 알려진 트레이드오프로 유지).
+- ✅ 게임 선택 메커니즘 추가 — 사용자가 다음 게임(룰 미정, **4인용** 확정)을 준비하며 "가위바위보와 새 게임을 어떻게 고르게 할지" 질문. 확인 결과 (1) 선택은 방 만들기 전 `MainPage`에서, (2) 초대링크로 들어온 상대는 선택 없이 방의 `gameType`을 그대로 따름, 으로 확정. 조사해보니 `room.service.ts`가 `MAX_PLAYERS=2` 상수 하드코딩 + `createRoom`이 `gameType`을 인자로 안 받고 항상 `"rps"` 고정이라, `CLAUDE.md`가 표방하던 "새 게임 추가 시 room/socket 안 건드리기" 원칙이 실제로는 지켜지지 않고 있었음 — 이번에 그 뼈대를 실제로 갖춤.
+  - 신규 `backend/src/game/registry.ts`: `GAME_DEFS`(`{ [gameType]: { maxPlayers } }`) — 실제 구현된 게임만 등록, 현재는 `rps: { maxPlayers: 2 }` 하나.
+  - `backend/src/room/room.types.ts`: `Room`에 `maxPlayers: number` 필드 추가.
+  - `backend/src/room/room.service.ts`: `MAX_PLAYERS` 상수 제거, `createRoom(nickname, gameType, socketId)`가 `GAME_DEFS[gameType]`을 조회해 없으면 에러를 던지고 있으면 `room.maxPlayers`에 저장. `joinRoom`/`allReady`/`allHandsSelected`의 정원 비교를 전부 `room.maxPlayers` 기준으로 교체.
+  - `backend/src/socket/index.ts`: `createRoom` 핸들러가 `{ nickname, gameType }`을 받아 try/catch로 감싸(잘못된 gameType이면 기존 `error` 이벤트로 안내) `roomService.createRoom`을 호출. `roomCreated`/`playerJoined`/`gameStarted` payload에 `gameType`/`maxPlayers` 추가.
+  - 신규 `frontend/src/game/registry.ts`: `GAME_OPTIONS` — `{ id: "rps", label: "가위바위보", maxPlayers: 2 }`와, 아직 실존하지 않는 두 번째 게임을 위한 `{ id: "coming-soon-4p", label: "4인 게임", maxPlayers: 4, comingSoon: true }`(비활성 표시 전용, 백엔드로 전송 안 됨).
+  - `frontend/src/pages/MainPage.tsx`: `GAME_OPTIONS`를 순회하는 선택 타일 UI 추가(기본값 `"rps"`, `comingSoon` 항목은 클릭 불가+"준비 중" 배지), `createRoom` emit에 `gameType` 포함, `roomCreated`/`playerJoined` 핸들러가 응답의 `gameType`/`maxPlayers`를 그대로 `onEnterRoom`에 전달.
+  - `frontend/src/pages/JoinInvitePage.tsx`/`App.tsx`: `onJoined`/`onEnterRoom`/`Screen`(`"room"`/`"game"` variant)이 `gameType`/`maxPlayers`를 함께 들고 다니도록 시그니처 확장.
+  - `frontend/src/pages/RoomPage.tsx`: 새 prop `gameType`/`maxPlayers` 수신, `players.length < 2`/`=== 2` 하드코딩을 `maxPlayers` 기준으로 일반화("N/M명" 표시로 변경), 경기 방식(`MATCH_FORMATS`) 선택 UI는 `gameType === "rps"`일 때만 렌더링(RPS만의 "N판 M선승" 개념이라 다른 게임엔 안 맞을 수 있어 대비, 현재는 rps만 있어 동작 변화 없음).
+  - `GamePage.tsx`는 건드리지 않음 — 두 번째 게임이 아직 실존하지 않아 분기(dispatch) 대상이 없음(YAGNI).
+  - 검증: `backend`/`frontend` 모두 `tsc` 통과, 프론트 `oxlint`/`vite build` 통과. Docker Desktop이 꺼져 있어(`docker ps` 실패) 로컬 dev 서버(백엔드 3100, 프론트 5173)로 socket.io-client 스크립트를 직접 작성해 (1) `createRoom`에 `gameType: "rps"`를 보내면 `roomCreated`에 `gameType`/`maxPlayers: 2`가 정확히 오는지 (2) 두 번째 플레이어 참가 시 `playerJoined`에도 동일하게 오는지 (3) 정원(2명) 초과 시 세 번째 참가자가 "방이 가득 찼습니다" 에러를 받는지 (4) 존재하지 않는 `gameType`으로 방 생성 시도 시 "지원하지 않는 게임 타입입니다" 에러를 받는지 — 전부 통과 확인. 다만 이 세션엔 브라우저 자동화 도구가 연결되어 있지 않아 `MainPage`의 실제 선택 타일 UI(비활성 "4인 게임" 배지 등)는 화면으로 직접 확인하지 못했음 — 사용자가 `http://localhost:5173`에서 직접 확인 필요.
+  - `CLAUDE.md`: `Room` 인터페이스에 `maxPlayers` 추가, Socket 이벤트 표(`createRoom`/`roomCreated`/`playerJoined`/`gameStarted`) 갱신, "게임 선택 방식" 절 신설(선택 시점, 레지스트리 패턴, 새 게임 추가 절차, 아직 일반화 안 된 부분(`cards`/`wins`/`applyRoundResult`의 RPS 전용 로직)을 후속 과제로 명시).
+- ✅ `MainPage` 타이틀을 "가위바위보 온라인"에서 "JoinMyGame"으로 변경, 기존 타이틀 위에 있던 가위바위보 이모지(✌️✊✋)는 게임 선택 타일 중 "가위바위보" 버튼 아래 여백(라벨만 있고 `comingSoon` 배지가 없어 "4인 게임" 타일보다 짧아 보이던 자리)으로 이동. `frontend/src/game/registry.ts`의 `GameOption`에 `icon?: string` 필드 추가, `rps` 항목에 `icon: "✌️✊✋"` 설정 — `MainPage.tsx`가 타일 렌더링 시 라벨 아래 아이콘을 표시. `tsc -b`/`oxlint` 통과.
+- ✅ 가위바위보에 AI(컴퓨터) 상대 추가 — "혼자서도 즐길 수 있게" 요청. 처음엔 "AI와 대전" 전용 버튼으로 방 생성 시점부터 AI를 넣는 방식을 검토했으나, 사용자가 "기존 대기방에서 AI를 추가하는 방식"을 제안해 대기실(`RoomPage`)에서 빈 자리를 채우는 토글 버튼 방식으로 확정(추가로 "제거도 필요하다"는 요청을 받아 add/remove 토글로 마무리). AI 손 선택 전략은 "무작위, 단 특수카드 보유 시 우선 사용"으로 확정(상대의 `specialCardCount`가 이미 화면에 보이므로 예측 가능하되 완전 랜덤보다 도전적인 밸런스라고 판단).
+  - 핵심 설계 포인트: `room.service.ts`에서 `p.ready = false`로 전원을 리셋하던 세 곳(`applyRoundResult`, `markRematchReady`의 새 라운드 진입, `setMatchFormat`)을 전부 `p.ready = !!p.isAI`로 바꿔 "AI는 항상 ready" 불변식을 심음 — 덕분에 `ready`/`rematch`/`setMatchFormat` 소켓 핸들러는 AI를 전혀 의식할 필요가 없어짐(사람이 한 번만 액션해도 AI 몫까지 즉시 반영됨).
+  - `backend/src/game/registry.ts`: `GameDef`에 `supportsAI?: boolean` 추가, `rps: { maxPlayers: 2, supportsAI: true }`.
+  - 신규 `backend/src/game/rps/rps.ai.ts`: `chooseAiHand(cards)` — 보유 특수카드(총/중지/거울)가 있으면 그중 무작위 우선, 없으면 기본 카드 중 무작위.
+  - `backend/src/room/room.types.ts`: `Player`에 `isAI?: boolean` 추가.
+  - `backend/src/room/room.service.ts`: `addAiPlayer(roomCode)`(정원 초과/AI 미지원 게임이면 에러, 남은 빈 자리를 전부 `ai:${roomCode}:${seq}` socketId를 가진 AI 플레이어로 채움) / `removeAiPlayer(roomCode)`(`isAI` 필터로 제거) 신설. `removePlayer`에 `room.players = room.players.filter(p => !p.isAI)` 한 줄 추가해 사람이 나가면 남은 AI도 같이 정리되어 기존 "정원 0이면 방 삭제" 분기가 그대로 재사용되게 함.
+  - `backend/src/socket/index.ts`: `addAiPlayer`/`removeAiPlayer` 핸들러 추가(응답은 기존 `playersUpdated` 재사용). `selectHand` 핸들러가 사람의 선택 직후 `isAI && selectedHand === null`인 플레이어를 찾아 `chooseAiHand`로 즉시 대신 선택해줌. `broadcastPlayers`가 AI 뷰어(실제 연결된 소켓 없음)에는 emit하지 않도록 필터링.
+  - `frontend/src/types/index.ts`/`frontend/src/game/registry.ts`: `Player.isAI?`/`GameOption.supportsAI?` 추가.
+  - `frontend/src/pages/RoomPage.tsx`: 정원 미달+AI 지원 게임이면 "AI로 채우기", AI가 이미 있으면 "AI 제거" 버튼을 토글로 표시(둘 다 새 리스너 없이 기존 `playersUpdated` 구독으로 반영). 상대가 AI면 방 코드 공유 카드를 숨김(정원이 이미 찼으니 초대해도 에러만 뜸).
+  - `frontend/src/pages/GamePage.tsx`: 상대가 AI면 `ChatBox`를 숨김(응답 없는 봇에게 채팅은 의미 없음).
+  - `MainPage.tsx`/`App.tsx`/`createRoom`/`roomCreated` 관련 코드는 전혀 안 건드림 — AI는 방이 만들어진 뒤 대기실에서만 추가/제거됨.
+  - 검증: 백엔드/프론트 `tsc` 통과, 프론트 `oxlint`/`vite build` 통과. 로컬 dev 서버(백엔드 3100, 프론트 5173 — 백엔드는 `tsx watch`가 아니라 `tsx` 1회 실행이라 코드 변경 후 재시작 필요했음, `EADDRINUSE`로 이전 프로세스가 안 죽어있던 걸 `netstat`/`taskkill`로 정리)에 socket.io-client 스크립트로 (1) `addAiPlayer` 후 `playersUpdated`에 사람+AI 2명, AI `ready: true` (2) 정원 찬 상태에서 재요청 시 "방이 가득 찼습니다" 에러 (3) `removeAiPlayer` 후 1명으로 줄고 재추가 가능 (4) `ready` 한 번만으로 `gameStarted` 즉시 발생 (5) `selectHand` 한 번만으로 `result` 즉시 수신 + 여러 라운드 돌려 AI가 실제로 특수카드(거울 등)를 우선 내는지 확인 (6) `rematch` 한 번만으로 `rematchStarted` 즉시 발생 (7) `leaveRoom` 후 같은 코드로 재입장 시도하면 "존재하지 않는 방입니다"(방 완전 정리) — 전부 통과. 테스트 스크립트 자체에 버그가 두 번 있었음(카드가 바닥나는 손만 반복해서 무한 대기, `Promise.race`를 emit보다 늦게 구성해 응답을 못 받고 무한 대기) — 둘 다 로직 문제가 아니라 테스트 스크립트 버그였고 고쳐서 재검증함. 브라우저 자동화 도구가 이번 세션에 없어 "AI로 채우기/제거" 버튼 UI 자체는 육안으로 보지 못함.
+  - `CLAUDE.md`: `Player`에 `isAI` 필드 문서화, Socket 이벤트 표에 `addAiPlayer`/`removeAiPlayer` 추가, "AI 대전" 절 신설(진입 방식, "AI는 항상 ready" 불변식, 손 선택 전략, 방 정리 규칙).
 
 ## 2. 현재 진행 중인 작업
 
@@ -124,7 +150,8 @@
 
 ## 3. 앞으로 해야 할 작업
 
-- ⬜ (필요 시) MVP 이후 확장: 묵찌빠, 오목, 카드게임 등 `game/` 하위 신규 게임 추가
+- ⬜ 실제 두 번째 게임(4인용, 룰 미정) 설계 및 구현 — `backend/src/game/registry.ts`에 등록 + `game/<name>/` 모듈 작성 + `frontend/src/game/registry.ts`의 `coming-soon-4p` 항목을 실제 게임으로 교체. 이때 `room.service.ts`의 `cards`/`wins`/`applyRoundResult`(현재 RPS 전용 1:1 판정) 로직을 게임별로 분리하는 리팩터링이 함께 필요할 가능성 높음.
+- ⬜ (필요 시) MVP 이후 추가 확장: 묵찌빠, 오목, 카드게임 등
 
 ## 4. 현재 이슈나 메모
 

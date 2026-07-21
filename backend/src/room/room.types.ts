@@ -9,11 +9,13 @@ export interface Player {
   selectedHand: Hand | null;
   wins: number;
   cards: Record<Hand, number>;
+  isAI?: boolean;
 }
 
 export interface Room {
   roomCode: string;
   gameType: string;
+  maxPlayers: number;
   players: Player[];
   gameState: GameState;
   drawStack: number;

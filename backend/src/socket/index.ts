@@ -1,6 +1,7 @@
 import { Server, Socket } from "socket.io";
 import * as chatService from "../chat/chat.service";
 import { GameResult, judgeGame } from "../game";
+import { chooseAiHand } from "../game/rps/rps.ai";
 import { Hand, SPECIAL_HANDS } from "../game/rps/rps.types";
 import * as roomService from "../room/room.service";
 import { Player, Room } from "../room/room.types";
@@ -38,9 +39,11 @@ function broadcastPlayers(
   event: string,
   extra: Record<string, unknown> = {},
 ): void {
-  room.players.forEach((viewer) => {
-    io.to(viewer.socketId).emit(event, { players: toWirePlayers(room.players, viewer.socketId), ...extra });
-  });
+  room.players
+    .filter((viewer) => !viewer.isAI) // AI는 실제 연결된 소켓이 없어 전송 대상에서 제외
+    .forEach((viewer) => {
+      io.to(viewer.socketId).emit(event, { players: toWirePlayers(room.players, viewer.socketId), ...extra });
+    });
 }
 
 function leaveCurrentRoom(io: Server, socket: Socket): void {
@@ -65,14 +68,23 @@ export function registerSocketHandlers(io: Server): void {
   io.on("connection", (socket: Socket) => {
     console.log(`[socket] connected: ${socket.id}`);
 
-    socket.on("createRoom", ({ nickname }: { nickname: string }) => {
+    socket.on("createRoom", ({ nickname, gameType }: { nickname: string; gameType: string }) => {
       if (!roomActionLimiter.check(socket.handshake.address)) {
         socket.emit("error", { message: "너무 많은 요청입니다. 잠시 후 다시 시도해주세요." });
         return;
       }
-      const room = roomService.createRoom(nickname, socket.id);
-      socket.join(room.roomCode);
-      socket.emit("roomCreated", { roomCode: room.roomCode, winsToMatch: room.winsToMatch });
+      try {
+        const room = roomService.createRoom(nickname, gameType, socket.id);
+        socket.join(room.roomCode);
+        socket.emit("roomCreated", {
+          roomCode: room.roomCode,
+          gameType: room.gameType,
+          maxPlayers: room.maxPlayers,
+          winsToMatch: room.winsToMatch,
+        });
+      } catch (err) {
+        socket.emit("error", { message: (err as Error).message });
+      }
     });
 
     socket.on("joinRoom", ({ roomCode, nickname }: { roomCode: string; nickname: string }) => {
@@ -83,7 +95,11 @@ export function registerSocketHandlers(io: Server): void {
       try {
         const room = roomService.joinRoom(roomCode, nickname, socket.id);
         socket.join(roomCode);
-        broadcastPlayers(io, room, "playerJoined", { winsToMatch: room.winsToMatch });
+        broadcastPlayers(io, room, "playerJoined", {
+          gameType: room.gameType,
+          maxPlayers: room.maxPlayers,
+          winsToMatch: room.winsToMatch,
+        });
       } catch (err) {
         socket.emit("error", { message: (err as Error).message });
       }
@@ -99,12 +115,35 @@ export function registerSocketHandlers(io: Server): void {
       }
     });
 
+    socket.on("addAiPlayer", ({ roomCode }: { roomCode: string }) => {
+      try {
+        const room = roomService.addAiPlayer(roomCode);
+        broadcastPlayers(io, room, "playersUpdated");
+      } catch (err) {
+        socket.emit("error", { message: (err as Error).message });
+      }
+    });
+
+    socket.on("removeAiPlayer", ({ roomCode }: { roomCode: string }) => {
+      try {
+        const room = roomService.removeAiPlayer(roomCode);
+        broadcastPlayers(io, room, "playersUpdated");
+      } catch (err) {
+        socket.emit("error", { message: (err as Error).message });
+      }
+    });
+
     socket.on("ready", ({ roomCode }: { roomCode: string }) => {
       try {
         const room = roomService.setReady(roomCode, socket.id);
         broadcastPlayers(io, room, "playersUpdated");
         if (room.gameState === "PLAYING") {
-          broadcastPlayers(io, room, "gameStarted", { winsToMatch: room.winsToMatch, drawStack: room.drawStack });
+          broadcastPlayers(io, room, "gameStarted", {
+            gameType: room.gameType,
+            maxPlayers: room.maxPlayers,
+            winsToMatch: room.winsToMatch,
+            drawStack: room.drawStack,
+          });
         }
       } catch (err) {
         socket.emit("error", { message: (err as Error).message });
@@ -113,7 +152,11 @@ export function registerSocketHandlers(io: Server): void {
 
     socket.on("selectHand", ({ roomCode, hand }: { roomCode: string; hand: Hand }) => {
       try {
-        const room = roomService.selectHand(roomCode, socket.id, hand);
+        let room = roomService.selectHand(roomCode, socket.id, hand);
+        const aiPlayer = room.players.find((p) => p.isAI && p.selectedHand === null);
+        if (aiPlayer) {
+          room = roomService.selectHand(roomCode, aiPlayer.socketId, chooseAiHand(aiPlayer.cards));
+        }
         if (roomService.allHandsSelected(room)) {
           const judged = judgeGame(room);
           const { room: updatedRoom, cardsReset } = roomService.applyRoundResult(

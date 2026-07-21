@@ -99,6 +99,7 @@ function GamePage({
 
   const self = players.find((p) => p.socketId === socket.id);
   const opponent = players.find((p) => p.socketId !== socket.id);
+  const vsAI = players.some((p) => p.isAI);
   const selfCard = selectedHand ? getCardDef(selectedHand) : null;
 
   let opponentCard: CardDef | null = null;
@@ -259,12 +260,14 @@ function GamePage({
             )}
           </div>
 
-          <ChatBox
-            messages={messages}
-            selfSocketId={socket.id ?? ""}
-            onSend={onSendMessage}
-            messageListClassName="max-h-[360px] min-h-[200px]"
-          />
+          {!vsAI && (
+            <ChatBox
+              messages={messages}
+              selfSocketId={socket.id ?? ""}
+              onSend={onSendMessage}
+              messageListClassName="max-h-[360px] min-h-[200px]"
+            />
+          )}
         </div>
       </div>
     </div>

@@ -102,6 +102,7 @@ WAITING → READY → PLAYING → RESULT → (WAITING)
 interface Room {
   roomCode: string;       // 6자리 코드
   gameType: string;       // "rps" | 향후 "omok" 등 확장 대비
+  maxPlayers: number;      // 게임 종류별 정원 — backend/src/game/registry.ts의 GAME_DEFS에서 gameType별로 조회해 방 생성 시 고정
   players: Player[];
   gameState: GameState;
   drawStack: number;       // 누적 무승부 횟수 (연속일 필요 없음, 카드 리셋 트리거용) — DRAWS_TO_RESET(=3)에 도달하면 양쪽 카드 초기화 + 0으로 리셋
@@ -119,6 +120,7 @@ interface Player {
   selectedHand: Hand | null;
   wins: number;           // 현재 매치 내 라운드 승수
   cards: Record<Hand, number>; // 보유 카드 수량 (특수카드 시스템, 아래 참고)
+  isAI?: boolean;         // AI(컴퓨터) 상대 여부 — 아래 "AI 대전" 절 참고
 }
 ```
 
@@ -143,31 +145,52 @@ type Hand = "scissors" | "rock" | "paper";
 
 ---
 
+## 게임 선택 방식
+
+여러 게임을 지원하는 플랫폼이라, 어떤 게임을 할지 고르는 지점과 방법을 다음과 같이 고정한다:
+
+- **선택 시점**: 방을 만들기 전, `MainPage`에서만 고른다. 방은 생성되는 순간 `gameType`(과 그에 따른 `maxPlayers`)이 고정되며, 도중에 바꿀 수 없다.
+- **초대 링크로 들어온 상대**: 선택지가 없다. `JoinInvitePage`/코드 입력 참가 모두 방에 이미 저장된 `gameType`을 그대로 따른다.
+- **레지스트리 패턴**: 실제로 구현된 게임만 `backend/src/game/registry.ts`의 `GAME_DEFS`(`{ [gameType]: { maxPlayers, supportsAI? } }`)에 등록한다. `frontend/src/game/registry.ts`의 `GAME_OPTIONS`가 `MainPage`의 선택 UI를 렌더링하는 소스 — 아직 실제로 구현되지 않은 게임은 `comingSoon: true`로 표시해 선택은 안 되고 "준비 중"만 보이게 해둔다(현재 4인 게임 자리 표시자가 이 상태).
+- **새 게임 추가 절차**: (1) 백엔드 `GAME_DEFS`에 항목 추가 + `backend/src/game/<name>/`에 게임 로직 모듈 작성 + `backend/src/game/index.ts`의 `judgeGame` 스위치에 `case` 추가, (2) 프론트 `GAME_OPTIONS`의 해당 항목을 `comingSoon` 없이 실제 게임으로 교체. **`room/`, `socket/`는 건드리지 않아도 된다** — `room.service.ts`/`socket/index.ts`는 이미 `gameType`을 매개변수로 받아 레지스트리에서 정원을 조회하는 일반적인 구조로 되어 있음(가위바위보 하나만 있던 시절엔 `gameType`이 `"rps"`로 하드코딩되어 있었고 `MAX_PLAYERS=2`도 상수였는데, 두 번째 게임(4인용) 논의를 계기로 일반화함).
+- **아직 일반화하지 않은 부분(후속 과제)**: `room.service.ts`의 `cards`/`wins`/`winsToMatch`/`applyRoundResult`(무승부·카드 소모·1:1 승패 판정)는 여전히 RPS 전용 로직이 그대로 박혀 있다. 두 번째 게임(4인용, 룰 미정)이 실제로 설계되면 이 부분을 게임별 인터페이스로 분리하는 작업이 별도로 필요함 — 룰이 정해지지 않은 상태에서 미리 일반화하지 않기로 함(추측성 설계 방지).
+
+## AI 대전
+
+혼자서도 즐길 수 있도록, 대기실(`RoomPage`)에서 상대가 없을 때 빈 자리를 AI로 채울 수 있다.
+
+- **진입 방식**: `MainPage`/`createRoom`은 전혀 관여하지 않는다. 방을 만든 뒤 대기실에서 정원이 덜 찼고(`players.length < maxPlayers`) 해당 게임이 `GAME_DEFS[gameType].supportsAI`(현재 `rps`만 true)를 지원하면 "AI로 채우기" 버튼이 뜨고, `addAiPlayer` 이벤트로 남은 빈 자리를 전부 AI 플레이어로 채운다. AI가 이미 있으면 같은 자리에 "AI 제거" 버튼이 대신 뜨고 `removeAiPlayer`로 되돌릴 수 있다(토글).
+- **"AI는 항상 ready" 불변식**: AI 플레이어는 생성 시 `ready: true`로 시작하고, `room.service.ts`에서 `p.ready = false`로 전원을 리셋하는 모든 지점(`applyRoundResult`, `markRematchReady`의 새 라운드 진입, `setMatchFormat`)이 실제로는 `p.ready = !!p.isAI`로 되어 있어 AI만은 리셋되지 않는다. 덕분에 `ready`/`rematch`/`setMatchFormat` 소켓 핸들러는 AI를 전혀 의식하지 않아도 되고, 사람이 한 번만 액션을 취하면(Ready 누르기, 재경기 누르기) 즉시 다음 단계로 넘어간다.
+- **손 선택 전략**: `backend/src/game/rps/rps.ai.ts`의 `chooseAiHand(cards)` — 보유한 특수카드(총/중지/거울)가 있으면 그중 무작위로 우선 내고, 없으면 기본 카드 중 무작위로 낸다. 사람 쪽엔 상대의 `specialCardCount`가 이미 보이므로(카드 시스템 절 참고) 예측 가능하면서도 완전 랜덤보다 약간 도전적인 난이도. `socket/index.ts`의 `selectHand` 핸들러가 사람의 선택 직후 AI 몫을 대신 골라 즉시 `roomService.selectHand`를 호출해준다.
+- **정리**: 사람이 나가면(`leaveRoom`/`disconnect`) 상대할 사람이 없는 AI도 함께 제거되어(`removePlayer`) 방이 자동 삭제된다(기존 "정원 0이면 방 삭제" 로직을 그대로 재사용). AI는 실제 연결된 소켓이 없으므로 `broadcastPlayers`가 AI에게는 emit하지 않는다.
+
 ## Socket 이벤트 설계
 
 ### Client → Server
 
 | 이벤트 | 페이로드 | 설명 |
 |---|---|---|
-| `createRoom` | `{ nickname }` | 방 생성 요청 |
+| `createRoom` | `{ nickname, gameType }` | 방 생성 요청. `gameType`은 `backend/src/game/registry.ts`의 `GAME_DEFS`에 등록된 것만 허용, 아니면 `error`로 거부 |
 | `joinRoom` | `{ roomCode, nickname }` | 방 참가 요청 |
 | `ready` | `{ roomCode }` | Ready 상태 전환 |
 | `selectHand` | `{ roomCode, hand }` | 손 선택 |
 | `rematch` | `{ roomCode }` | 재경기 요청 |
 | `leaveRoom` | — | 방 나가기 요청 (자발적으로 나가는 경우; 연결 종료 시엔 `disconnect`가 동일 로직을 처리) |
 | `setMatchFormat` | `{ roomCode, winsToMatch }` | 경기 방식 변경 요청 (2 또는 3만 허용, 대기실에서만 의미 있음) |
+| `addAiPlayer` | `{ roomCode }` | 대기실에서 빈 자리를 AI로 채우는 요청 (해당 게임이 `supportsAI`이고 정원이 덜 찼을 때만) |
+| `removeAiPlayer` | `{ roomCode }` | 방에 있는 AI 플레이어 제거 요청 |
 | `chatMessage` | `{ roomCode, message }` | 채팅 메시지 전송 (대기실/게임 화면 공통) |
 
 ### Server → Client
 
 | 이벤트 | 페이로드 | 설명 |
 |---|---|---|
-| `roomCreated` | `{ roomCode, winsToMatch }` | 방 생성 완료 |
-| `playerJoined` | `{ players, winsToMatch }` | 상대방 입장 알림 |
-| `playersUpdated` | `{ players }` | 플레이어 상태(ready 등) 변경 시 전체 목록 브로드캐스트 (Ready/재경기 동의 실시간 표시용) |
+| `roomCreated` | `{ roomCode, gameType, maxPlayers, winsToMatch }` | 방 생성 완료 |
+| `playerJoined` | `{ players, gameType, maxPlayers, winsToMatch }` | 상대방 입장 알림 |
+| `playersUpdated` | `{ players }` | 플레이어 상태(ready 등) 변경 시 전체 목록 브로드캐스트 (Ready/재경기 동의 실시간 표시용, AI 추가/제거도 이 이벤트로 전달) |
 | `playerLeft` | `{ players }` | 상대방 연결 종료로 방을 나감 (남은 플레이어를 대기실로 되돌리는 용도) |
 | `matchFormatUpdated` | `{ winsToMatch }` | 경기 방식(3판 2선승/5판 3선승)이 변경됨 — 대기실에 있는 양쪽에 브로드캐스트 |
-| `gameStarted` | `{ players, winsToMatch, drawStack }` | 두 플레이어 모두 Ready, 게임 시작. payload를 실어 보내는 이유: 클라이언트가 자신의 로컬 상태(클로저)에 의존하면 다른 이벤트와 연달아 도착할 때 리액트 상태 반영 전 값을 읽는 경쟁 상태가 생길 수 있어, 항상 이 payload를 신뢰해야 함 |
+| `gameStarted` | `{ players, gameType, maxPlayers, winsToMatch, drawStack }` | 정원(`maxPlayers`)만큼 모두 Ready, 게임 시작. payload를 실어 보내는 이유: 클라이언트가 자신의 로컬 상태(클로저)에 의존하면 다른 이벤트와 연달아 도착할 때 리액트 상태 반영 전 값을 읽는 경쟁 상태가 생길 수 있어, 항상 이 payload를 신뢰해야 함 |
 | `result` | `{ winner, hands, winsDelta, scores, matchOver, cardsReset, drawStack }` | 라운드 결과. `scores`는 `{ socketId: 승수 }`, `matchOver`는 이 라운드로 매치가 끝났는지, `cardsReset`은 이 라운드로 무승부 누적이 `DRAWS_TO_RESET`에 도달해 양쪽 카드가 초기화됐는지, `drawStack`은 갱신된 누적 무승부 횟수 |
 | `rematchStarted` | `{ drawStack }` | 재경기(또는 다음 라운드) 시작. 새 매치가 시작된 경우 `drawStack`은 0 |
 | `chatMessage` | `{ socketId, nickname, message, timestamp }` | 채팅 메시지 브로드캐스트 (같은 방 전체, 카드처럼 수신자별로 가릴 필요가 없어 단순 `io.to(roomCode).emit`) |

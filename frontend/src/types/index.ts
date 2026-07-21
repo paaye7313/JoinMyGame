@@ -14,6 +14,7 @@ export interface Player {
   // 서버에서 0으로 가려져서 옴 — 대신 specialCardCount로 총 보유량만 알 수 있음
   cards: Record<Hand, number>;
   specialCardCount: number;
+  isAI?: boolean;
 }
 
 export interface ChatMessage {

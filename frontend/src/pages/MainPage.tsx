@@ -3,10 +3,18 @@ import { useSocket } from "../hooks/useSocket";
 import type { Player } from "../types";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
+import Badge from "../components/ui/Badge";
 import { loadNickname, saveNickname } from "../nickname";
+import { GAME_OPTIONS } from "../game/registry";
 
 interface MainPageProps {
-  onEnterRoom: (roomCode: string, players: Player[], winsToMatch: number) => void;
+  onEnterRoom: (
+    roomCode: string,
+    players: Player[],
+    gameType: string,
+    maxPlayers: number,
+    winsToMatch: number,
+  ) => void;
 }
 
 const INPUT_CLASS =
@@ -16,10 +24,21 @@ function MainPage({ onEnterRoom }: MainPageProps) {
   const socket = useSocket();
   const [nickname, setNickname] = useState(loadNickname);
   const [roomCodeInput, setRoomCodeInput] = useState("");
+  const [gameType, setGameType] = useState("rps");
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    function handleRoomCreated({ roomCode, winsToMatch }: { roomCode: string; winsToMatch: number }) {
+    function handleRoomCreated({
+      roomCode,
+      gameType,
+      maxPlayers,
+      winsToMatch,
+    }: {
+      roomCode: string;
+      gameType: string;
+      maxPlayers: number;
+      winsToMatch: number;
+    }) {
       onEnterRoom(
         roomCode,
         [
@@ -33,11 +52,23 @@ function MainPage({ onEnterRoom }: MainPageProps) {
             specialCardCount: 0,
           },
         ],
+        gameType,
+        maxPlayers,
         winsToMatch,
       );
     }
-    function handlePlayerJoined({ players, winsToMatch }: { players: Player[]; winsToMatch: number }) {
-      onEnterRoom(roomCodeInput.trim(), players, winsToMatch);
+    function handlePlayerJoined({
+      players,
+      gameType,
+      maxPlayers,
+      winsToMatch,
+    }: {
+      players: Player[];
+      gameType: string;
+      maxPlayers: number;
+      winsToMatch: number;
+    }) {
+      onEnterRoom(roomCodeInput.trim(), players, gameType, maxPlayers, winsToMatch);
     }
     function handleError({ message }: { message: string }) {
       setErrorMessage(message);
@@ -61,7 +92,7 @@ function MainPage({ onEnterRoom }: MainPageProps) {
     }
     setErrorMessage("");
     saveNickname(nickname.trim());
-    socket.emit("createRoom", { nickname });
+    socket.emit("createRoom", { nickname, gameType });
   }
 
   function handleJoinRoom() {
@@ -77,8 +108,7 @@ function MainPage({ onEnterRoom }: MainPageProps) {
   return (
     <div className="flex w-full max-w-sm flex-1 flex-col items-center justify-center gap-6 px-6 py-10">
       <div className="text-center">
-        <div className="mb-2 text-5xl">✌️✊✋</div>
-        <h1 className="text-3xl font-bold text-text-h">가위바위보 온라인</h1>
+        <h1 className="text-3xl font-bold text-text-h">JoinMyGame</h1>
       </div>
 
       <Card className="flex w-full flex-col gap-4">
@@ -90,6 +120,31 @@ function MainPage({ onEnterRoom }: MainPageProps) {
           onCompositionEnd={(e) => setNickname(e.currentTarget.value)}
           onBlur={(e) => setNickname(e.currentTarget.value)}
         />
+
+        <div className="flex flex-col gap-2">
+          <span className="text-sm text-text">게임 선택</span>
+          <div className="flex gap-2">
+            {GAME_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                disabled={option.comingSoon}
+                onClick={() => setGameType(option.id)}
+                className={`flex flex-1 flex-col items-center gap-1 rounded-2xl border px-3 py-2.5 text-sm font-medium transition ${
+                  option.comingSoon
+                    ? "cursor-not-allowed border-border text-text opacity-50"
+                    : gameType === option.id
+                      ? "border-primary bg-primary-bg text-primary"
+                      : "border-border text-text-h hover:border-primary"
+                }`}
+              >
+                {option.label}
+                {option.icon && <span className="text-2xl">{option.icon}</span>}
+                {option.comingSoon && <Badge tone="neutral">준비 중</Badge>}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <Button onClick={handleCreateRoom}>방 만들기</Button>
 

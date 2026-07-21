@@ -7,7 +7,13 @@ import { loadNickname, saveNickname } from "../nickname";
 
 interface JoinInvitePageProps {
   roomCode: string;
-  onJoined: (roomCode: string, players: Player[], winsToMatch: number) => void;
+  onJoined: (
+    roomCode: string,
+    players: Player[],
+    gameType: string,
+    maxPlayers: number,
+    winsToMatch: number,
+  ) => void;
   onCancel: () => void;
 }
 
@@ -20,8 +26,18 @@ function JoinInvitePage({ roomCode, onJoined, onCancel }: JoinInvitePageProps) {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    function handlePlayerJoined({ players, winsToMatch }: { players: Player[]; winsToMatch: number }) {
-      onJoined(roomCode, players, winsToMatch);
+    function handlePlayerJoined({
+      players,
+      gameType,
+      maxPlayers,
+      winsToMatch,
+    }: {
+      players: Player[];
+      gameType: string;
+      maxPlayers: number;
+      winsToMatch: number;
+    }) {
+      onJoined(roomCode, players, gameType, maxPlayers, winsToMatch);
     }
     function handleError({ message }: { message: string }) {
       setErrorMessage(message);

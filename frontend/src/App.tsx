@@ -9,8 +9,22 @@ import type { ChatMessage, Player } from "./types";
 type Screen =
   | { name: "main" }
   | { name: "invite"; roomCode: string }
-  | { name: "room"; roomCode: string; players: Player[]; winsToMatch: number }
-  | { name: "game"; roomCode: string; players: Player[]; winsToMatch: number };
+  | {
+      name: "room";
+      roomCode: string;
+      players: Player[];
+      gameType: string;
+      maxPlayers: number;
+      winsToMatch: number;
+    }
+  | {
+      name: "game";
+      roomCode: string;
+      players: Player[];
+      gameType: string;
+      maxPlayers: number;
+      winsToMatch: number;
+    };
 
 function matchInviteRoomCode(pathname: string): string | null {
   const match = pathname.match(/^\/room\/(\d{6})$/);
@@ -45,8 +59,14 @@ function App() {
     history.pushState(null, "", "/");
   }
 
-  function enterRoom(roomCode: string, players: Player[], winsToMatch: number) {
-    setScreen({ name: "room", roomCode, players, winsToMatch });
+  function enterRoom(
+    roomCode: string,
+    players: Player[],
+    gameType: string,
+    maxPlayers: number,
+    winsToMatch: number,
+  ) {
+    setScreen({ name: "room", roomCode, players, gameType, maxPlayers, winsToMatch });
     history.pushState(null, "", `/room/${roomCode}`);
   }
 
@@ -58,7 +78,14 @@ function App() {
     function handlePlayerLeft({ players }: { players: Player[] }) {
       if (screen.name === "game") {
         setToast("상대방이 나가서 대기실로 돌아왔습니다.");
-        setScreen({ name: "room", roomCode: screen.roomCode, players, winsToMatch: screen.winsToMatch });
+        setScreen({
+          name: "room",
+          roomCode: screen.roomCode,
+          players,
+          gameType: screen.gameType,
+          maxPlayers: screen.maxPlayers,
+          winsToMatch: screen.winsToMatch,
+        });
       } else if (screen.name === "room") {
         setToast("상대방이 퇴장하였습니다.");
       }
@@ -109,11 +136,20 @@ function App() {
         <RoomPage
           roomCode={screen.roomCode}
           initialPlayers={screen.players}
+          gameType={screen.gameType}
+          maxPlayers={screen.maxPlayers}
           initialWinsToMatch={screen.winsToMatch}
           messages={messages}
           onSendMessage={(message) => handleSendMessage(screen.roomCode, message)}
           onGameStart={(players, winsToMatch) =>
-            setScreen({ name: "game", roomCode: screen.roomCode, players, winsToMatch })
+            setScreen({
+              name: "game",
+              roomCode: screen.roomCode,
+              players,
+              gameType: screen.gameType,
+              maxPlayers: screen.maxPlayers,
+              winsToMatch,
+            })
           }
           onExit={handleExit}
         />

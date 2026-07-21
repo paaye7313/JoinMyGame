@@ -1,9 +1,9 @@
+import { GAME_DEFS } from "../game/registry";
 import { Hand } from "../game/rps/rps.types";
 import { DRAWS_TO_RESET, createEmptyCards, createStartingCards, grantCards } from "../game/rps/rps.cards";
 import { roomStore } from "./room.store";
 import { Player, Room } from "./room.types";
 
-const MAX_PLAYERS = 2;
 export const DEFAULT_WINS_TO_MATCH = 3;
 export const ALLOWED_WINS_TO_MATCH = [2, 3];
 
@@ -28,7 +28,10 @@ function dedupeNickname(existingNicknames: string[], nickname: string): string {
   return `${nickname} (${n})`;
 }
 
-export function createRoom(nickname: string, socketId: string): Room {
+export function createRoom(nickname: string, gameType: string, socketId: string): Room {
+  const gameDef = GAME_DEFS[gameType];
+  if (!gameDef) throw new Error(`지원하지 않는 게임 타입입니다: ${gameType}`);
+
   const roomCode = roomStore.generateRoomCode();
   const player: Player = {
     socketId,
@@ -40,7 +43,8 @@ export function createRoom(nickname: string, socketId: string): Room {
   };
   const room: Room = {
     roomCode,
-    gameType: "rps",
+    gameType,
+    maxPlayers: gameDef.maxPlayers,
     players: [player],
     gameState: "WAITING",
     drawStack: 0,
@@ -52,7 +56,7 @@ export function createRoom(nickname: string, socketId: string): Room {
 
 export function joinRoom(roomCode: string, nickname: string, socketId: string): Room {
   const room = getRoomOrThrow(roomCode);
-  if (room.players.length >= MAX_PLAYERS) throw new Error("방이 가득 찼습니다.");
+  if (room.players.length >= room.maxPlayers) throw new Error("방이 가득 찼습니다.");
   const finalNickname = dedupeNickname(
     room.players.map((p) => p.nickname),
     nickname,
@@ -125,7 +129,7 @@ export function applyRoundResult(
   }
 
   room.players.forEach((p) => {
-    p.ready = false;
+    p.ready = !!p.isAI; // AI는 항상 다음 라운드에 동의한 상태
   });
   room.gameState = "RESULT";
   return { room, cardsReset };
@@ -138,7 +142,7 @@ export function markRematchReady(roomCode: string, socketId: string): Room {
   if (allReady(room)) {
     const startNewMatch = isMatchOver(room);
     room.players.forEach((p) => {
-      p.ready = false;
+      p.ready = !!p.isAI; // AI는 항상 다음 라운드에 동의한 상태
       p.selectedHand = null;
       if (startNewMatch) {
         p.wins = 0;
@@ -162,8 +166,36 @@ export function setMatchFormat(roomCode: string, winsToMatch: number): Room {
   }
   room.winsToMatch = winsToMatch;
   room.players.forEach((p) => {
-    p.ready = false;
+    p.ready = !!p.isAI; // AI는 항상 다음 라운드에 동의한 상태
   });
+  return room;
+}
+
+export function addAiPlayer(roomCode: string): Room {
+  const room = getRoomOrThrow(roomCode);
+  const gameDef = GAME_DEFS[room.gameType];
+  if (!gameDef?.supportsAI) throw new Error("이 게임은 AI 대전을 지원하지 않습니다.");
+  if (room.players.length >= room.maxPlayers) throw new Error("방이 가득 찼습니다.");
+
+  let seq = room.players.length;
+  while (room.players.length < room.maxPlayers) {
+    seq += 1;
+    room.players.push({
+      socketId: `ai:${roomCode}:${seq}`,
+      nickname: room.maxPlayers > 2 ? `AI 상대 ${seq}` : "AI 상대",
+      ready: true,
+      selectedHand: null,
+      wins: 0,
+      cards: createEmptyCards(),
+      isAI: true,
+    });
+  }
+  return room;
+}
+
+export function removeAiPlayer(roomCode: string): Room {
+  const room = getRoomOrThrow(roomCode);
+  room.players = room.players.filter((p) => !p.isAI);
   return room;
 }
 
@@ -173,6 +205,7 @@ export function removePlayer(socketId: string): Room | undefined {
     if (index === -1) continue;
 
     room.players.splice(index, 1);
+    room.players = room.players.filter((p) => !p.isAI); // 사람이 나가면 상대할 사람이 없는 AI도 같이 정리
     if (room.players.length === 0) {
       roomStore.delete(room.roomCode);
     } else {
@@ -196,9 +229,9 @@ export function findPlayerInRoom(roomCode: string, socketId: string): Player {
 }
 
 export function allReady(room: Room): boolean {
-  return room.players.length === MAX_PLAYERS && room.players.every((p) => p.ready);
+  return room.players.length === room.maxPlayers && room.players.every((p) => p.ready);
 }
 
 export function allHandsSelected(room: Room): boolean {
-  return room.players.length === MAX_PLAYERS && room.players.every((p) => p.selectedHand !== null);
+  return room.players.length === room.maxPlayers && room.players.every((p) => p.selectedHand !== null);
 }
