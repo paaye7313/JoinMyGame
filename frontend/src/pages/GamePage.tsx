@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSocket } from "../hooks/useSocket";
 import type { ChatMessage, GameResult, Hand, Player } from "../types";
 import Button from "../components/ui/Button";
@@ -121,10 +121,17 @@ function GamePage({
   }
 
   const continueLabel = result?.matchOver ? "재경기" : "다음 라운드";
-  const availableCards = HAND_CARDS.filter((card) => (self?.cards[card.id] ?? 0) > 0).map((card) => ({
-    card,
-    count: self?.cards[card.id] ?? 0,
-  }));
+  // 채팅 메시지 등 카드와 무관한 리렌더링에도 매번 새 배열이 되지 않도록 memo —
+  // PhaserPlayZone의 동기화 effect가 이 배열의 참조 동일성에 의존하기 때문에, 여기서 참조가
+  // 계속 바뀌면 실제 카드 변화가 없어도 syncState가 재호출되어 뒤집기 연출이 다시 재생됨.
+  const availableCards = useMemo(
+    () =>
+      HAND_CARDS.filter((card) => (self?.cards[card.id] ?? 0) > 0).map((card) => ({
+        card,
+        count: self?.cards[card.id] ?? 0,
+      })),
+    [self],
+  );
 
   return (
     <div className="flex w-full max-w-5xl flex-1 flex-col items-center gap-6 px-6 py-10">

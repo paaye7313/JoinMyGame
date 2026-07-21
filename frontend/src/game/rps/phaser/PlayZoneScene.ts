@@ -83,6 +83,9 @@ export default class PlayZoneScene extends Phaser.Scene {
   // 선택 카드의 클릭 영역은 Container 안에 넣지 않고 씬 최상위에 별도로 관리함 —
   // Container 자식으로 넣으면 히트테스트 좌표가 어긋나 대부분의 클릭이 안 먹는 문제가 있었음.
   private selectionHitZones: Phaser.GameObjects.Rectangle[] = [];
+  // syncState는 카드 값이 안 바뀐 채로도(예: 채팅 수신 등 무관한 리렌더) 다시 호출될 수 있어,
+  // "공개 안 됨 → 공개됨"으로 실제로 전환되는 순간에만 뒤집기 연출을 재생하도록 이전 상태를 기억.
+  private wasRevealed = false;
 
   constructor() {
     super("PlayZoneScene");
@@ -126,9 +129,10 @@ export default class PlayZoneScene extends Phaser.Scene {
 
     this.renderSelection(state);
 
-    if (state.revealed && state.opponentCard) {
+    if (state.revealed && state.opponentCard && !this.wasRevealed) {
       this.playFlip(this.opponentSlot!);
     }
+    this.wasRevealed = state.revealed;
   }
 
   private renderSlot(
