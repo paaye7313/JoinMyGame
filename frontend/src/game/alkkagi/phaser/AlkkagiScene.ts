@@ -168,11 +168,36 @@ export default class AlkkagiScene extends Phaser.Scene {
   }
 
   private handlePointerMove(pointer: Phaser.Input.Pointer): void {
-    if (!this.dragging || !this.aimLine) return;
-    this.aimLine.clear();
+    if (!this.dragging) return;
+    this.drawAimLine(pointer.x, pointer.y);
+  }
+
+  private handlePointerUp(pointer: Phaser.Input.Pointer): void {
+    if (!this.dragging) return;
+    this.dragging = false;
 
     const pullX = pointer.x - this.dragStart.x;
     const pullY = pointer.y - this.dragStart.y;
+    const pullDist = Math.hypot(pullX, pullY);
+    if (pullDist < MAX_DRAG_PX * MIN_POWER) {
+      this.aimLine?.clear(); // 너무 약하게 당겨서 취소된 경우엔 남겨둘 조준선도 없음
+      return;
+    }
+
+    // 확정된 조준선은 지우지 않고 그대로 남겨둠 — 본인이 방금 어떻게 조준했는지 확인할 수 있게.
+    // 이 라운드의 발사(playResult)가 시작될 때 지워짐.
+    this.drawAimLine(pointer.x, pointer.y);
+
+    const power = Math.min(1, pullDist / MAX_DRAG_PX);
+    this.onAim?.(-pullX / pullDist, -pullY / pullDist, power);
+  }
+
+  private drawAimLine(pointerX: number, pointerY: number): void {
+    if (!this.aimLine) return;
+    this.aimLine.clear();
+
+    const pullX = pointerX - this.dragStart.x;
+    const pullY = pointerY - this.dragStart.y;
     const pullDist = Math.hypot(pullX, pullY) || 1;
     const power = Math.min(1, pullDist / MAX_DRAG_PX);
     const lineLen = power * MAX_DRAG_PX;
@@ -184,19 +209,5 @@ export default class AlkkagiScene extends Phaser.Scene {
     this.aimLine.moveTo(this.dragStart.x, this.dragStart.y);
     this.aimLine.lineTo(this.dragStart.x + launchX * lineLen, this.dragStart.y + launchY * lineLen);
     this.aimLine.strokePath();
-  }
-
-  private handlePointerUp(pointer: Phaser.Input.Pointer): void {
-    if (!this.dragging) return;
-    this.dragging = false;
-    this.aimLine?.clear();
-
-    const pullX = pointer.x - this.dragStart.x;
-    const pullY = pointer.y - this.dragStart.y;
-    const pullDist = Math.hypot(pullX, pullY);
-    if (pullDist < MAX_DRAG_PX * MIN_POWER) return; // 너무 약하게 당기면 취소 취급
-
-    const power = Math.min(1, pullDist / MAX_DRAG_PX);
-    this.onAim?.(-pullX / pullDist, -pullY / pullDist, power);
   }
 }
