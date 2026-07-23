@@ -46,11 +46,26 @@ function broadcastPlayers(
     });
 }
 
+// 살아있는 전원의 조준이 다 모이면(사람 제출 또는 접속 끊김으로 인한 탈락 처리) 라운드를 판정.
+// AI만 남아 계속 스스로 조준을 채우는 경우(사람 전원 이탈)엔 매치가 끝날 때까지 반복 판정해 방이 멈춰있지 않게 함.
+function finishAlkkagiRoundIfReady(io: Server, room: Room): void {
+  while (roomService.allAlkkagiAimsSubmitted(room)) {
+    const { keyframes, arenaRadius, round, matchOver, winnerId } = roomService.resolveAlkkagiRound(room.roomCode);
+    io.to(room.roomCode).emit("alkkagiRoundResult", { keyframes, arenaRadius, round, matchOver, winnerId });
+    if (matchOver) break;
+  }
+  broadcastPlayers(io, room, "playersUpdated");
+}
+
 function leaveCurrentRoom(io: Server, socket: Socket): void {
   chatService.clearChatState(socket.id);
   const room = roomService.removePlayer(socket.id);
   if (!room) return;
   socket.leave(room.roomCode);
+  if (room.gameType === "alkkagi" && room.gameState === "PLAYING") {
+    finishAlkkagiRoundIfReady(io, room);
+    return;
+  }
   if (room.players.length > 0) {
     broadcastPlayers(io, room, "playerLeft");
   }
@@ -143,12 +158,25 @@ export function registerSocketHandlers(io: Server): void {
             maxPlayers: room.maxPlayers,
             winsToMatch: room.winsToMatch,
             drawStack: room.drawStack,
+            alkkagiArena: room.alkkagiArena,
           });
         }
       } catch (err) {
         socket.emit("error", { message: (err as Error).message });
       }
     });
+
+    socket.on(
+      "alkkagiAim",
+      ({ roomCode, dx, dy, power }: { roomCode: string; dx: number; dy: number; power: number }) => {
+        try {
+          const room = roomService.submitAlkkagiAim(roomCode, socket.id, { dx, dy, power });
+          finishAlkkagiRoundIfReady(io, room);
+        } catch (err) {
+          socket.emit("error", { message: (err as Error).message });
+        }
+      },
+    );
 
     socket.on("selectHand", ({ roomCode, hand }: { roomCode: string; hand: Hand }) => {
       try {
@@ -188,7 +216,7 @@ export function registerSocketHandlers(io: Server): void {
         const room = roomService.markRematchReady(roomCode, socket.id);
         broadcastPlayers(io, room, "playersUpdated");
         if (room.gameState === "PLAYING") {
-          io.to(roomCode).emit("rematchStarted", { drawStack: room.drawStack });
+          io.to(roomCode).emit("rematchStarted", { drawStack: room.drawStack, alkkagiArena: room.alkkagiArena });
         }
       } catch (err) {
         socket.emit("error", { message: (err as Error).message });

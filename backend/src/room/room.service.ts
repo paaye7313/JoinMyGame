@@ -1,3 +1,5 @@
+import * as alkkagiRound from "../game/alkkagi/alkkagi.round";
+import { AlkkagiAim } from "../game/alkkagi/alkkagi.types";
 import { GAME_DEFS } from "../game/registry";
 import { Hand } from "../game/rps/rps.types";
 import { DRAWS_TO_RESET, createEmptyCards, createStartingCards, grantCards } from "../game/rps/rps.cards";
@@ -78,13 +80,38 @@ export function setReady(roomCode: string, socketId: string): Room {
   player.ready = true;
   if (allReady(room)) {
     room.gameState = "PLAYING";
-    room.players.forEach((p) => {
-      p.cards = createStartingCards();
-    });
+    if (room.gameType === "alkkagi") {
+      alkkagiRound.initializeAlkkagiMatch(room);
+    } else {
+      room.players.forEach((p) => {
+        p.cards = createStartingCards();
+      });
+    }
   } else {
     room.gameState = "READY";
   }
   return room;
+}
+
+export function submitAlkkagiAim(roomCode: string, socketId: string, aim: AlkkagiAim): Room {
+  const room = getRoomOrThrow(roomCode);
+  const player = getPlayerOrThrow(room, socketId);
+  alkkagiRound.submitAim(room, player, aim);
+  return room;
+}
+
+export function allAlkkagiAimsSubmitted(room: Room): boolean {
+  return alkkagiRound.allAimsSubmitted(room);
+}
+
+export interface AlkkagiRoundOutcome extends alkkagiRound.AlkkagiRoundResult {
+  room: Room;
+}
+
+export function resolveAlkkagiRound(roomCode: string): AlkkagiRoundOutcome {
+  const room = getRoomOrThrow(roomCode);
+  const result = alkkagiRound.resolveRound(room);
+  return { room, ...result };
 }
 
 export function selectHand(roomCode: string, socketId: string, hand: Hand): Room {
@@ -140,16 +167,20 @@ export function markRematchReady(roomCode: string, socketId: string): Room {
   const player = getPlayerOrThrow(room, socketId);
   player.ready = true;
   if (allReady(room)) {
-    const startNewMatch = isMatchOver(room);
+    // 알까기는 "다음 라운드"가 rematch 없이 자동 진행되므로, rematch가 호출되는 시점은 항상 매치가 끝난 뒤의 진짜 재경기
+    const startNewMatch = room.gameType === "alkkagi" ? true : isMatchOver(room);
     room.players.forEach((p) => {
       p.ready = !!p.isAI; // AI는 항상 다음 라운드에 동의한 상태
       p.selectedHand = null;
-      if (startNewMatch) {
+      if (startNewMatch && room.gameType !== "alkkagi") {
         p.wins = 0;
         p.cards = createStartingCards();
       }
     });
-    if (startNewMatch) room.drawStack = 0;
+    if (startNewMatch) {
+      room.drawStack = 0;
+      if (room.gameType === "alkkagi") alkkagiRound.initializeAlkkagiMatch(room);
+    }
     room.gameState = "PLAYING";
   }
   return room;
@@ -203,6 +234,14 @@ export function removePlayer(socketId: string): Room | undefined {
   for (const room of roomStore.values()) {
     const index = room.players.findIndex((p) => p.socketId === socketId);
     if (index === -1) continue;
+
+    // 알까기는 매치 진행 중엔 방을 나가지 않고(자리 유지) 그 자리에서 탈락 처리만 함 —
+    // 4인용이라 RPS처럼 남은 인원을 대기실로 되돌리면 나머지 플레이어들의 진행 중인 매치가 날아가버림
+    if (room.gameType === "alkkagi" && room.gameState === "PLAYING") {
+      const player = room.players[index];
+      if (player.alkkagi) player.alkkagi.alive = false;
+      return room;
+    }
 
     room.players.splice(index, 1);
     room.players = room.players.filter((p) => !p.isAI); // 사람이 나가면 상대할 사람이 없는 AI도 같이 정리

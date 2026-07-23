@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSocket } from "../hooks/useSocket";
-import type { ChatMessage, Player } from "../types";
+import type { AlkkagiArena, ChatMessage, Player } from "../types";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
@@ -16,7 +16,7 @@ interface RoomPageProps {
   initialWinsToMatch: number;
   messages: ChatMessage[];
   onSendMessage: (message: string) => void;
-  onGameStart: (players: Player[], winsToMatch: number) => void;
+  onGameStart: (players: Player[], winsToMatch: number, alkkagiArena?: AlkkagiArena) => void;
   onExit: () => void;
 }
 
@@ -69,8 +69,16 @@ function RoomPage({
   }, [socket]);
 
   useEffect(() => {
-    function handleGameStarted({ players, winsToMatch }: { players: Player[]; winsToMatch: number }) {
-      onGameStart(players, winsToMatch);
+    function handleGameStarted({
+      players,
+      winsToMatch,
+      alkkagiArena,
+    }: {
+      players: Player[];
+      winsToMatch: number;
+      alkkagiArena?: AlkkagiArena;
+    }) {
+      onGameStart(players, winsToMatch, alkkagiArena);
     }
 
     socket.on("gameStarted", handleGameStarted);

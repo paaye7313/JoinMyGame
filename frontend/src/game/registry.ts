@@ -9,5 +9,5 @@ export interface GameOption {
 
 export const GAME_OPTIONS: GameOption[] = [
   { id: "rps", label: "가위바위보", maxPlayers: 2, icon: "✌️✊✋", supportsAI: true },
-  { id: "coming-soon-4p", label: "4인 게임", maxPlayers: 4, comingSoon: true },
+  { id: "alkkagi", label: "알까기 배틀로얄", maxPlayers: 4, icon: "🔴🔵", supportsAI: true },
 ];

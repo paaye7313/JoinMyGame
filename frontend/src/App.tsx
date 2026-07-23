@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useSocket } from "./hooks/useSocket";
+import AlkkagiGamePage from "./pages/AlkkagiGamePage";
 import GamePage from "./pages/GamePage";
 import JoinInvitePage from "./pages/JoinInvitePage";
 import MainPage from "./pages/MainPage";
 import RoomPage from "./pages/RoomPage";
-import type { ChatMessage, Player } from "./types";
+import type { AlkkagiArena, ChatMessage, Player } from "./types";
 
 type Screen =
   | { name: "main" }
@@ -24,6 +25,7 @@ type Screen =
       gameType: string;
       maxPlayers: number;
       winsToMatch: number;
+      alkkagiArena?: AlkkagiArena;
     };
 
 function matchInviteRoomCode(pathname: string): string | null {
@@ -141,7 +143,7 @@ function App() {
           initialWinsToMatch={screen.winsToMatch}
           messages={messages}
           onSendMessage={(message) => handleSendMessage(screen.roomCode, message)}
-          onGameStart={(players, winsToMatch) =>
+          onGameStart={(players, winsToMatch, alkkagiArena) =>
             setScreen({
               name: "game",
               roomCode: screen.roomCode,
@@ -149,12 +151,23 @@ function App() {
               gameType: screen.gameType,
               maxPlayers: screen.maxPlayers,
               winsToMatch,
+              alkkagiArena,
             })
           }
           onExit={handleExit}
         />
       )}
-      {screen.name === "game" && (
+      {screen.name === "game" && screen.gameType === "alkkagi" && screen.alkkagiArena && (
+        <AlkkagiGamePage
+          roomCode={screen.roomCode}
+          players={screen.players}
+          alkkagiArena={screen.alkkagiArena}
+          messages={messages}
+          onSendMessage={(message) => handleSendMessage(screen.roomCode, message)}
+          onExit={handleExit}
+        />
+      )}
+      {screen.name === "game" && screen.gameType !== "alkkagi" && (
         <GamePage
           roomCode={screen.roomCode}
           players={screen.players}
