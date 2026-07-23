@@ -158,6 +158,11 @@
   - `frontend/src/game/registry.ts`의 `coming-soon-4p` 자리를 `alkkagi` 항목(`icon: "🔴🔵"`)으로 교체 완료 — 이제 메인 화면에서 실제로 선택 가능.
   - 튜닝 필요(현재 모두 placeholder 상수, 실제 플레이해보며 조정 필요): `alkkagi.physics.ts`의 `POWER_TO_SPEED`(18)가 무대 시작 반경(220) 대비 다소 강해서, AI끼리도 랜덤 조준만으로 1~2라운드 안에 매치가 끝나는 경우가 잦음(체감상 좀 빠름) — 다음에 만질 때 `POWER_TO_SPEED`를 낮추거나 `ARENA_START_RADIUS`를 키우는 쪽으로 조정 고려.
   - 범위 밖(이번엔 안 함): 모바일 터치 조준 검증(드래그 자체는 될 가능성이 높지만 데스크톱 마우스로만 확인함), 매치 중 접속 끊김 후 진짜 재접속/복귀(세션이 없어서 지금은 그냥 그 자리에서 탈락 처리만 됨 — 앱 전체에 재접속 개념이 아직 없다는 기존 한계와 동일).
+- ✅ Ready 취소 기능 추가(가위바위보/알까기 공통). 그동안 대기실 "Ready"와 결과 화면 "재경기"/"다음 라운드" 버튼은 한 번 누르면 상대방이 움직이기 전까지 되돌릴 방법이 없었음(`disabled={self?.ready}`로 그냥 막아뒀음) — 실수로 눌렀거나 상대를 더 기다리고 싶을 때 취소가 안 되는 문제.
+  - `room.service.ts`에 `setUnready(roomCode, socketId)` 추가 — `player.ready`가 대기실 Ready와 재경기/다음 라운드 동의 양쪽에 똑같이 쓰이는 필드라서 함수 하나로 둘 다 처리됨(게임 종류도 안 가림, RPS/알까기 공통). `room.gameState==="PLAYING"`(이미 게임이 시작된 뒤)이면 되돌릴 게 없으므로 에러로 거부. `gameState==="RESULT"`(결과 화면에서 재경기 대기 중)일 땐 그 상태를 그대로 유지하고(WAITING으로 잘못 되돌리지 않음) `ready`만 false로.
+  - `socket/index.ts`에 신규 `unready` 이벤트 핸들러 추가(기존 `ready`와 동일한 패턴, `playersUpdated` 재브로드캐스트).
+  - 프론트: `RoomPage.tsx`의 "Ready" 버튼, `GamePage.tsx`(RPS)의 "재경기"/"다음 라운드" 버튼, `AlkkagiGamePage.tsx`의 "재경기" 버튼 세 곳 모두 `disabled` 대신 `self?.ready` 여부로 라벨("Ready 취소"/"{원래 라벨} 취소")과 스타일(primary↔secondary)이 바뀌는 토글 버튼으로 변경, 클릭 핸들러도 `ready`/`rematch` ↔ `unready`로 분기.
+  - 검증: 백엔드 socket.io-client 스크립트로 (1) ready→unready 후 다시 ready=false로 반영되는지 (2) 양쪽 다 ready 하면 gameStarted 발생 (3) 게임 시작된 뒤(PLAYING) unready 시도하면 "이미 게임이 진행 중입니다" 에러로 거부되는지 확인. Claude in Chrome으로 실제 브라우저에서 대기실 "Ready" ↔ "Ready 취소" 토글이 라벨·스타일 모두 정상 전환되는지 시각 확인(재경기 화면 쪽은 백엔드가 동일 로직을 공유해서 별도 브라우저 검증은 생략). `tsc -b`(frontend)/`tsc --noEmit`(backend)/`oxlint` 전부 통과.
 
 ## 2. 현재 진행 중인 작업
 

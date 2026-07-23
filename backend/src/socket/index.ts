@@ -166,6 +166,15 @@ export function registerSocketHandlers(io: Server): void {
       }
     });
 
+    socket.on("unready", ({ roomCode }: { roomCode: string }) => {
+      try {
+        const room = roomService.setUnready(roomCode, socket.id);
+        broadcastPlayers(io, room, "playersUpdated");
+      } catch (err) {
+        socket.emit("error", { message: (err as Error).message });
+      }
+    });
+
     socket.on(
       "alkkagiAim",
       ({ roomCode, dx, dy, power }: { roomCode: string; dx: number; dy: number; power: number }) => {

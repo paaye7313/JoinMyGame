@@ -117,6 +117,10 @@ function AlkkagiGamePage({
     socket.emit("rematch", { roomCode });
   }
 
+  function handleCancelRematch() {
+    socket.emit("unready", { roomCode });
+  }
+
   function handleLeave() {
     socket.emit("leaveRoom");
     onExit();
@@ -209,8 +213,11 @@ function AlkkagiGamePage({
                   {winnerId === socket.id ? "우승!" : winnerId ? `${winnerNickname ?? "상대"} 우승` : "무승부 (동시 탈락)"}
                 </p>
                 <div className="flex justify-center gap-3">
-                  <Button onClick={handleRematch} disabled={self?.ready}>
-                    재경기
+                  <Button
+                    variant={self?.ready ? "secondary" : "primary"}
+                    onClick={self?.ready ? handleCancelRematch : handleRematch}
+                  >
+                    {self?.ready ? "재경기 취소" : "재경기"}
                   </Button>
                   <Button variant="secondary" onClick={handleLeave}>
                     나가기

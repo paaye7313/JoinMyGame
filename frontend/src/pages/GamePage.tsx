@@ -88,6 +88,10 @@ function GamePage({
     socket.emit("rematch", { roomCode });
   }
 
+  function handleCancelRematch() {
+    socket.emit("unready", { roomCode });
+  }
+
   function handleLeave() {
     socket.emit("leaveRoom");
     onExit();
@@ -256,8 +260,11 @@ function GamePage({
                 )}
 
                 <div className="flex justify-center gap-3">
-                  <Button onClick={handleRematch} disabled={self?.ready}>
-                    {continueLabel}
+                  <Button
+                    variant={self?.ready ? "secondary" : "primary"}
+                    onClick={self?.ready ? handleCancelRematch : handleRematch}
+                  >
+                    {self?.ready ? `${continueLabel} 취소` : continueLabel}
                   </Button>
                   <Button variant="secondary" onClick={handleLeave}>
                     나가기

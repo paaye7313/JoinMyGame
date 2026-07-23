@@ -95,6 +95,10 @@ function RoomPage({
     socket.emit("ready", { roomCode });
   }
 
+  function handleUnready() {
+    socket.emit("unready", { roomCode });
+  }
+
   function handleSelectFormat(format: number) {
     socket.emit("setMatchFormat", { roomCode, winsToMatch: format });
   }
@@ -202,8 +206,11 @@ function RoomPage({
         )}
 
         <div className="flex gap-3">
-          <Button onClick={handleReady} disabled={self?.ready}>
-            Ready
+          <Button
+            variant={self?.ready ? "secondary" : "primary"}
+            onClick={self?.ready ? handleUnready : handleReady}
+          >
+            {self?.ready ? "Ready 취소" : "Ready"}
           </Button>
           <Button variant="secondary" onClick={handleLeave}>
             나가기

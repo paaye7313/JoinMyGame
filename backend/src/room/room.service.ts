@@ -93,6 +93,19 @@ export function setReady(roomCode: string, socketId: string): Room {
   return room;
 }
 
+// 대기실 Ready와 결과 화면 재경기/다음 라운드 동의 둘 다 같은 ready 필드를 쓰므로, 취소도 하나로 처리.
+// 게임이 이미 시작된 뒤(PLAYING)엔 되돌릴 ready 상태가 없으므로 막음.
+export function setUnready(roomCode: string, socketId: string): Room {
+  const room = getRoomOrThrow(roomCode);
+  const player = getPlayerOrThrow(room, socketId);
+  if (room.gameState === "PLAYING") throw new Error("이미 게임이 진행 중입니다.");
+  player.ready = false;
+  if (room.gameState !== "RESULT") {
+    room.gameState = room.players.some((p) => p.ready) ? "READY" : "WAITING";
+  }
+  return room;
+}
+
 export function submitAlkkagiAim(roomCode: string, socketId: string, aim: AlkkagiAim): Room {
   const room = getRoomOrThrow(roomCode);
   const player = getPlayerOrThrow(room, socketId);

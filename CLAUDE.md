@@ -199,6 +199,7 @@ type Hand = "scissors" | "rock" | "paper";
 | `createRoom` | `{ nickname, gameType }` | 방 생성 요청. `gameType`은 `backend/src/game/registry.ts`의 `GAME_DEFS`에 등록된 것만 허용, 아니면 `error`로 거부 |
 | `joinRoom` | `{ roomCode, nickname }` | 방 참가 요청 |
 | `ready` | `{ roomCode }` | Ready 상태 전환 |
+| `unready` | `{ roomCode }` | Ready(대기실) 또는 재경기/다음 라운드 동의 취소. 게임이 이미 시작됐으면(`PLAYING`) `error`로 거부 |
 | `selectHand` | `{ roomCode, hand }` | 손 선택 (RPS) |
 | `alkkagiAim` | `{ roomCode, dx, dy, power }` | 조준 제출 — 드래그 릴리즈 시 1회 (알까기) |
 | `rematch` | `{ roomCode }` | 재경기 요청 (알까기는 매치 종료 후에만 의미 있음 — "다음 라운드"는 자동 진행) |
