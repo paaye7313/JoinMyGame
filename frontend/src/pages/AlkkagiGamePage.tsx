@@ -188,7 +188,7 @@ function AlkkagiGamePage({
 
         <div className="flex w-full flex-col gap-4 lg:w-96">
           <div className="flex flex-col gap-3 rounded-2xl border border-border bg-panel p-4 shadow-panel">
-            <div className="flex flex-wrap justify-center gap-6">
+            <div className="grid grid-cols-2 justify-items-center gap-4">
               {players.map((p) => (
                 <PlayerAvatar
                   key={p.socketId}

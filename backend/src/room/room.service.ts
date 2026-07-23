@@ -71,6 +71,11 @@ export function joinRoom(roomCode: string, nickname: string, socketId: string): 
     wins: 0,
     cards: createEmptyCards(),
   });
+  // 인원 구성이 바뀌었으니 기존에 Ready 해뒀던 사람들도 다시 확인하게 함 —
+  // 안 그러면 새로 들어온 사람 의사와 무관하게 예전 Ready가 그대로 남아있다가 뜻하지 않게 바로 시작될 수 있음
+  room.players.forEach((p) => {
+    p.ready = !!p.isAI;
+  });
   return room;
 }
 
@@ -234,12 +239,20 @@ export function addAiPlayer(roomCode: string): Room {
       isAI: true,
     });
   }
+  // 인원 구성이 바뀌었으니 사람들의 Ready도 다시 확인하게 함(AI는 항상 ready) —
+  // 이미 Ready 해뒀던 사람이 AI로 자리가 다 채워지자마자 본인 의사 확인 없이 바로 게임이 시작되는 걸 방지
+  room.players.forEach((p) => {
+    p.ready = !!p.isAI;
+  });
   return room;
 }
 
 export function removeAiPlayer(roomCode: string): Room {
   const room = getRoomOrThrow(roomCode);
   room.players = room.players.filter((p) => !p.isAI);
+  room.players.forEach((p) => {
+    p.ready = false;
+  });
   return room;
 }
 

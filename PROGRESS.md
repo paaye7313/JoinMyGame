@@ -163,6 +163,11 @@
   - `socket/index.ts`에 신규 `unready` 이벤트 핸들러 추가(기존 `ready`와 동일한 패턴, `playersUpdated` 재브로드캐스트).
   - 프론트: `RoomPage.tsx`의 "Ready" 버튼, `GamePage.tsx`(RPS)의 "재경기"/"다음 라운드" 버튼, `AlkkagiGamePage.tsx`의 "재경기" 버튼 세 곳 모두 `disabled` 대신 `self?.ready` 여부로 라벨("Ready 취소"/"{원래 라벨} 취소")과 스타일(primary↔secondary)이 바뀌는 토글 버튼으로 변경, 클릭 핸들러도 `ready`/`rematch` ↔ `unready`로 분기.
   - 검증: 백엔드 socket.io-client 스크립트로 (1) ready→unready 후 다시 ready=false로 반영되는지 (2) 양쪽 다 ready 하면 gameStarted 발생 (3) 게임 시작된 뒤(PLAYING) unready 시도하면 "이미 게임이 진행 중입니다" 에러로 거부되는지 확인. Claude in Chrome으로 실제 브라우저에서 대기실 "Ready" ↔ "Ready 취소" 토글이 라벨·스타일 모두 정상 전환되는지 시각 확인(재경기 화면 쪽은 백엔드가 동일 로직을 공유해서 별도 브라우저 검증은 생략). `tsc -b`(frontend)/`tsc --noEmit`(backend)/`oxlint` 전부 통과.
+  - 배포 후 사용자가 파이에서 재현한 이슈: `docker compose restart`만으로는 백엔드가 새 코드(신규 `unready` 이벤트 핸들러)를 못 받아들여서 취소 버튼이 라벨만 바뀌고 실제로는 동작 안 하는 것처럼 보였음(프론트는 Vite가 파일을 다시 읽어 반영됐지만 백엔드 컨테이너가 완전히 새로 못 뜬 것으로 추정) — `docker compose up -d --force-recreate`로 재시도해서 해결됨. **참고**: 앞으로 배포 시 `docker compose restart`가 안 먹으면 이 방법을 먼저 시도할 것(Windows 바인드 마운트에서 있었던 것과 비슷한 종류의 "파일 변경 감지/반영 누락" 문제로 보임).
+- ✅ 대기실/방 구성이 바뀌면 Ready가 자동으로 풀리도록 변경(가위바위보/알까기 공통) — 사용자가 "AI 추가 시 Ready가 안 풀린다"고 지적한 데서 시작. 실제로 원래는 방 인원이 덜 찬 상태에서 미리 Ready를 눌러두고 그 뒤 "AI로 채우기"로 정원을 채우면, `addAiPlayer`가 기존 사람의 `ready`를 전혀 건드리지 않아서 방이 다 찼는데도 게임이 자동 시작되지 않고(그렇다고 이미 `ready=true`라 다시 누를 수도 없어서) **영영 멈춰버리는 잠재 버그**가 있었음 — 이번 수정으로 이 버그도 같이 해결됨.
+  - `room.service.ts`: `addAiPlayer`(AI로 정원을 채운 직후), `removeAiPlayer`(AI 제거 직후), `joinRoom`(새 플레이어 참가 직후) 세 곳 모두 기존 `setMatchFormat`이 쓰던 것과 같은 패턴(`p.ready = !!p.isAI`, AI는 항상 ready 불변식 유지)으로 인원 구성이 바뀔 때마다 사람들의 Ready를 리셋하도록 추가. 방 설정 변경(RPS `setMatchFormat`)은 기존에 이미 이 패턴이 있었어서 그대로 유지.
+  - 검증: socket.io-client 스크립트로 (1) 정원 미달 상태에서 Ready → AI로 채우기 → Ready가 false로 풀리는지, 그 뒤 다시 Ready를 누르면 실제로 게임이 시작되는지(막혀있던 시나리오가 뚫리는지) (2) Ready 상태에서 AI 제거 시 풀리는지 (3) 한쪽이 Ready한 상태에서 새 플레이어가 참가하면 기존 사람의 Ready가 풀리는지 — 전부 통과. `tsc --noEmit` 통과.
+- ✅ `AlkkagiGamePage.tsx`의 오른쪽 플레이어 목록 레이아웃 수정. 기존엔 `flex flex-wrap justify-center`라 컨테이너 폭(사이드바 `lg:w-96`)이 좁으면 닉네임 길이에 따라 3+1처럼 불균형하게 줄바꿈되던 문제 — `grid grid-cols-2 justify-items-center`로 바꿔서 4명이 항상 2×2(위 2명/아래 2명)로 고정되도록 함. Claude in Chrome으로 데스크톱 폭(1131px)과 좁은 폭(420px) 양쪽에서 항상 2×2로 나오는지 시각 확인.
 
 ## 2. 현재 진행 중인 작업
 
